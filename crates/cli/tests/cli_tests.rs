@@ -84,12 +84,15 @@ fn version_flag_prints_version() {
 // ── Stub subcommand tests ───────────────────────────────────────────────────
 
 #[test]
-fn scan_not_implemented_exits_zero() {
+fn scan_missing_config_exits_two() {
+    // With no .riceguard.yaml in the target dir, scan exits 2 (tool error)
+    // and prints a helpful "run init" message to stderr.
+    let tmp = tempfile::tempdir().unwrap();
     rice_guard()
-        .args(["scan", "."])
+        .args(["scan", tmp.path().to_str().unwrap()])
         .assert()
-        .success()
-        .stderr(predicate::str::contains("not yet implemented"));
+        .code(2)
+        .stderr(predicate::str::contains("rice-guard init"));
 }
 
 #[test]
