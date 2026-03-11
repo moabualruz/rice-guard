@@ -110,6 +110,8 @@ pub fn parse_sarif(result: &RawScanResult) -> Result<Vec<RawFinding>, ParseError
                 file_path,
                 line,
                 message: sarif_result.message.text,
+                matched_code: None,
+                suggested_replacement: None,
             });
         }
     }

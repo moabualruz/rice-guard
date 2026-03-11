@@ -116,6 +116,8 @@ fn parse_jscpd_content(content: &str, scanner: &str) -> Result<Vec<RawFinding>, 
                 file_path,
                 line: 0,
                 message,
+                matched_code: None,
+                suggested_replacement: None,
             }
         })
         .collect();

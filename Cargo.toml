@@ -35,6 +35,23 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio = { version = "1.50", features = ["full"] }
 
+# Tree-sitter (evidence extraction)
+tree-sitter = "0.24"
+tree-sitter-python = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-java = "0.23"
+tree-sitter-php = "0.23"
+tree-sitter-c-sharp = "0.23"
+tree-sitter-ruby = "0.23"
+tree-sitter-bash = "0.23"
+# Kotlin (community crate, less stable)
+tree-sitter-kotlin = "0.3"
+# Dart (community crate, behind feature flag)
+tree-sitter-dart = "0.1"
+
 # Testing
 assert_cmd = "2.2"
 predicates = "3.1"

@@ -48,6 +48,14 @@ pub struct RawFinding {
 
     /// Human-readable finding description.
     pub message: String,
+
+    /// The literal source code fragment that triggered this finding, if
+    /// provided by the scanner (e.g., Semgrep's `extra.lines` field).
+    pub matched_code: Option<String>,
+
+    /// An auto-fix code snippet suggested by the scanner (e.g., Semgrep
+    /// autofix). `None` if the scanner did not provide one.
+    pub suggested_replacement: Option<String>,
 }
 
 /// Error variants produced by the parser dispatch.

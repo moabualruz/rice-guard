@@ -56,3 +56,10 @@ test-results/
 
 # Generic agent workspace (session plans, memory)
 .agent/
+.gsd/
+adapters/
+docs/
+scripts/
+GSD-STYLE.md
+PROJECT_RULES.md
+model_capabilities.yaml

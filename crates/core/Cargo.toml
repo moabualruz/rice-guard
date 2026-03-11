@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
@@ -22,6 +24,11 @@ anyhow.workspace = true
 inquire.workspace = true
 indicatif.workspace = true
 atty.workspace = true
+
+# Tree-sitter reserved for Phase 4 AST-based evidence extraction.
+# Grammar crates are NOT included here yet — they require compiling large C
+# libraries and are unused until the AST feature is implemented.
+# tree-sitter.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

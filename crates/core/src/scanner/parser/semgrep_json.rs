@@ -37,6 +37,12 @@ struct SemgrepStart {
 struct SemgrepExtra {
     severity: String,
     message: String,
+    /// The matched source code lines (Semgrep `extra.lines` field).
+    #[serde(default)]
+    lines: Option<String>,
+    /// Auto-fix snippet when a Semgrep rule has an `autofix` field.
+    #[serde(rename = "fix", default)]
+    fix: Option<String>,
 }
 
 // -- Parsing -----------------------------------------------------------------
@@ -49,6 +55,10 @@ struct SemgrepExtra {
 /// - anything else -> `"info"`
 ///
 /// Returns `Ok(vec![])` when `results` key is absent (SCAN-08 edge case).
+///
+/// Evidence fields populated:
+/// - `matched_code` ← `extra.lines` (trimmed)
+/// - `suggested_replacement` ← `extra.fix` (autofix snippet)
 pub fn parse_semgrep_json(result: &RawScanResult) -> Result<Vec<RawFinding>, ParseError> {
     let content = std::fs::read_to_string(&result.output_file)?;
     let output: SemgrepOutput =
@@ -64,6 +74,14 @@ pub fn parse_semgrep_json(result: &RawScanResult) -> Result<Vec<RawFinding>, Par
         .map(|r| {
             let severity = normalize_semgrep_severity(&r.extra.severity);
             let file_path = r.path.replace('\\', "/");
+            // Trim matched_code so leading/trailing whitespace from Semgrep indentation
+            // does not pollute content-hash IDs.
+            let matched_code = r
+                .extra
+                .lines
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            let suggested_replacement = r.extra.fix;
             RawFinding {
                 scanner: result.scanner.clone(),
                 rule_id: r.check_id,
@@ -71,6 +89,8 @@ pub fn parse_semgrep_json(result: &RawScanResult) -> Result<Vec<RawFinding>, Par
                 file_path,
                 line: r.start.line,
                 message: r.extra.message,
+                matched_code,
+                suggested_replacement,
             }
         })
         .collect();
