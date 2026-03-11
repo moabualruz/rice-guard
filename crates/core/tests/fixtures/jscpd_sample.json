@@ -1,0 +1,32 @@
+{
+  "duplicates": [
+    {
+      "format": "typescript",
+      "lines": 20,
+      "tokens": 85,
+      "firstFile": {
+        "name": "src/a.ts",
+        "start": 1,
+        "end": 20
+      },
+      "secondFile": {
+        "name": "src/b.ts",
+        "start": 5,
+        "end": 24
+      },
+      "fragment": "function foo() {\n  const result = [];\n  for (let i = 0; i < 10; i++) {\n    result.push(i * 2);\n  }\n  return result;\n}"
+    }
+  ],
+  "statistics": {
+    "total": {
+      "lines": 1250,
+      "tokens": 8430,
+      "sources": 48,
+      "clones": 1,
+      "duplicatedLines": 20,
+      "duplicatedTokens": 85,
+      "percentage": 1.6,
+      "percentageTokens": 1.0
+    }
+  }
+}

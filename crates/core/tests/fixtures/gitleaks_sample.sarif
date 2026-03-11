@@ -1,0 +1,54 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "gitleaks",
+          "version": "8.18.2",
+          "rules": [
+            {
+              "id": "generic-api-key",
+              "name": "Generic API Key",
+              "shortDescription": {
+                "text": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "generic-api-key",
+          "message": {
+            "text": "API key found"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "config/settings.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 7,
+                  "startColumn": 12,
+                  "endLine": 7,
+                  "endColumn": 55
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "commitSha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+            "email": "dev@example.com",
+            "author": "Dev User",
+            "date": "2024-01-15T10:30:00Z",
+            "commitMessage": "add config"
+          }
+        }
+      ]
+    }
+  ]
+}

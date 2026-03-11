@@ -1,0 +1,46 @@
+{
+  "results": [
+    {
+      "check_id": "python.security.sql-injection",
+      "path": "src/db.py",
+      "start": {
+        "line": 42,
+        "col": 8
+      },
+      "end": {
+        "line": 42,
+        "col": 52
+      },
+      "extra": {
+        "severity": "ERROR",
+        "message": "SQL injection risk: user input concatenated directly into query",
+        "lines": "    query = 'SELECT * FROM users WHERE id = ' + user_id",
+        "metadata": {
+          "category": "security",
+          "cwe": "CWE-89"
+        }
+      }
+    },
+    {
+      "check_id": "python.best-practice.use-fstring",
+      "path": "src/utils.py",
+      "start": {
+        "line": 15,
+        "col": 4
+      },
+      "end": {
+        "line": 15,
+        "col": 38
+      },
+      "extra": {
+        "severity": "WARNING",
+        "message": "Prefer f-strings over % formatting for clarity",
+        "lines": "    msg = 'Hello, %s!' % name",
+        "metadata": {
+          "category": "best-practice"
+        }
+      }
+    }
+  ],
+  "errors": []
+}
