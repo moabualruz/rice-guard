@@ -96,7 +96,7 @@ pub fn file_freq_map(findings: &[RawFinding]) -> HashMap<String, u32> {
 /// Sort a slice of [`super::Issue`] by `priority_score` descending (highest first).
 ///
 /// Issues with equal scores retain their original relative order (stable sort).
-pub fn sort_issues(issues: &mut Vec<super::Issue>) {
+pub fn sort_issues(issues: &mut [super::Issue]) {
     issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
 }
 

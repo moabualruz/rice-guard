@@ -9,23 +9,29 @@ mod issue_tests {
 
     /// EVID-06 — fix.auto_fixable is true when a deterministic fixer can apply.
     #[test]
-    #[ignore = "Wave 0 stub: implement FixMetadata.auto_fixable population in Plan 03-03"]
     fn fix_meta_auto_fixable_present() {
         use rice_guard_core::issue::FixMetadata;
-        // Will test that IssueBuilder populates auto_fixable correctly.
-        let _ = FixMetadata {
-            auto_fixable: true,
-            auto_fix_tool: Some("ruff check --fix".to_string()),
-            auto_fix_category: Some("linter".to_string()),
-            suggested_replacement: None,
-            complexity: rice_guard_core::issue::FixComplexity::Trivial,
-        };
-        todo!("verify auto_fixable populated from fixer descriptor coverage");
+        // IssueBuilder populates auto_fixable via FixMetadata::from_finding().
+        // For a clippy finding, auto_fixable must be true.
+        let meta = FixMetadata::from_finding("clippy", "clippy::needless_return", None);
+        assert!(
+            meta.auto_fixable,
+            "auto_fixable must be true for clippy findings"
+        );
+        assert!(
+            meta.auto_fix_tool.is_some(),
+            "auto_fix_tool must be Some when auto_fixable"
+        );
+        // For a trivy CVE with no known fix, auto_fixable must be false.
+        let manual = FixMetadata::from_finding("trivy", "CVE-2023-12345", None);
+        assert!(
+            !manual.auto_fixable,
+            "auto_fixable must be false when no deterministic fix exists"
+        );
     }
 
     /// EVID-06 — fix.auto_fix_tool is Some when auto_fixable, None otherwise.
     #[test]
-    #[ignore = "Wave 0 stub: implement FixMetadata.auto_fix_tool population in Plan 03-03"]
     fn fix_meta_tool_present() {
         use rice_guard_core::issue::FixMetadata;
         let meta = FixMetadata {
@@ -45,16 +51,23 @@ mod issue_tests {
 
     /// EVID-07 — verification.rerun_command is a non-empty shell command.
     #[test]
-    #[ignore = "Wave 0 stub: implement VerificationInfo population in Plan 03-03"]
     fn verification_rerun_command_present() {
         use rice_guard_core::issue::VerificationInfo;
-        let info = VerificationInfo {
-            rerun_command: "rice-guard scan . --security".to_string(),
-            success_condition: "exit 0 with no findings".to_string(),
-        };
+        // from_scanner() produces a rerun_command for every scanner.
+        let semgrep_info = VerificationInfo::from_scanner("semgrep", "python.security.eval");
         assert!(
-            !info.rerun_command.is_empty(),
-            "rerun_command must not be empty"
+            !semgrep_info.rerun_command.is_empty(),
+            "rerun_command must not be empty for semgrep"
+        );
+        let trivy_info = VerificationInfo::from_scanner("trivy", "CVE-2023-12345");
+        assert!(
+            !trivy_info.rerun_command.is_empty(),
+            "rerun_command must not be empty for trivy"
+        );
+        let unknown_info = VerificationInfo::from_scanner("custom-tool", "custom-rule");
+        assert!(
+            !unknown_info.rerun_command.is_empty(),
+            "rerun_command must not be empty for unknown scanner"
         );
     }
 
@@ -63,20 +76,81 @@ mod issue_tests {
     /// EVID-08 — WSJF score computation: severity(40) + auto_fixable(20) +
     /// category(20) + file_freq(10) - cross_file(10).
     #[test]
-    #[ignore = "Wave 0 stub: implement wsjf_score() function in Plan 03-03"]
     fn wsjf_score_correct() {
         use rice_guard_core::issue::wsjf_score;
         // error + auto_fixable + formatter + freq=5 + not cross_file
         // = 40 + 20 + 20 + 5 - 0 = 85
         let score = wsjf_score("error", true, Some("formatter"), 5, false);
         assert_eq!(score, 85, "WSJF score must match formula");
+
+        // warning + no_fix + no_category + freq=0 = 20
+        let score2 = wsjf_score("warning", false, None, 0, false);
+        assert_eq!(score2, 20, "warning with no fix must score 20");
     }
 
-    /// EVID-08 — issues.json must be sorted highest WSJF score first.
+    /// EVID-08 — sort_issues produces highest WSJF score first.
     #[test]
-    #[ignore = "Wave 0 stub: implement WSJF sort in OutputWriter (Plan 03-04)"]
     fn wsjf_sort_order_highest_first() {
-        todo!("verify issues.json first entry has highest priority_score");
+        use rice_guard_core::issue::{
+            sort_issues, wsjf_score, EvidenceBlock, FixComplexity, FixMetadata, Issue,
+            VerificationInfo,
+        };
+
+        let make_issue = |id: &str, score: i32| Issue {
+            id: id.to_string(),
+            rule_id: "test-rule".to_string(),
+            severity: "warning".to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 1,
+            message: "test".to_string(),
+            scanner: "semgrep".to_string(),
+            evidence: EvidenceBlock {
+                matched_code: String::new(),
+                context_before: vec![],
+                context_after: vec![],
+                enclosing_function: None,
+                enclosing_class: None,
+                imports: vec![],
+            },
+            fix: FixMetadata {
+                auto_fixable: false,
+                auto_fix_tool: None,
+                auto_fix_category: None,
+                suggested_replacement: None,
+                complexity: FixComplexity::Moderate,
+            },
+            verification: VerificationInfo {
+                rerun_command: "rice-guard scan .".to_string(),
+                success_condition: "no findings".to_string(),
+            },
+            priority_score: score,
+            cross_file: false,
+        };
+
+        // Confirm wsjf_score values match expected formula.
+        let high = wsjf_score("error", true, Some("formatter"), 10, false); // 90
+        let mid = wsjf_score("warning", false, None, 0, false); // 20
+        let low = wsjf_score("info", false, None, 0, false); // 5
+
+        let mut issues = vec![
+            make_issue("low", low),
+            make_issue("high", high),
+            make_issue("mid", mid),
+        ];
+
+        sort_issues(&mut issues);
+
+        assert_eq!(issues[0].id, "high", "highest score must be first");
+        assert_eq!(issues[1].id, "mid", "mid score must be second");
+        assert_eq!(issues[2].id, "low", "lowest score must be last");
+        assert!(
+            issues[0].priority_score >= issues[1].priority_score,
+            "scores must be non-increasing"
+        );
+        assert!(
+            issues[1].priority_score >= issues[2].priority_score,
+            "scores must be non-increasing"
+        );
     }
 
     // ── EVID-09: Three output files written ───────────────────────────────────
