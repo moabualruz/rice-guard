@@ -33,7 +33,7 @@ pub struct SccLanguage {
 ///
 /// Contains detected languages plus availability probes for every
 /// configured scanner and fixer tool.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DetectionResult {
     /// Languages with at least one line of code, detected by `scc`.
     pub languages: Vec<SccLanguage>,

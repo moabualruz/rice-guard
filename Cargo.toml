@@ -15,7 +15,7 @@ clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
 inquire = "0.9"
 indicatif = "0.18"
-owo-colors = "4.3"
+owo-colors = { version = "4.3", features = ["supports-colors"] }
 atty = "0.2"
 
 # Core
