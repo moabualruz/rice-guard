@@ -1,0 +1,10 @@
+# ast-grep patterns for {{project_name}} ({{primary_language}})
+# Reference: https://ast-grep.github.io/reference/yaml.html
+
+rules:
+  - id: {{project_name}}-no-todo-comments
+    language: {{primary_language}}
+    rule:
+      pattern: "// TODO: $MSG"
+    message: "TODO comment found: $MSG — create a tracked issue instead."
+    severity: info

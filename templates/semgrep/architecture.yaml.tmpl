@@ -1,0 +1,15 @@
+# Semgrep architecture rules for {{project_name}}
+# Reference: https://semgrep.dev/docs/writing-rules/rule-syntax/
+
+rules:
+  - id: {{project_name}}-no-direct-db-in-controller
+    patterns:
+      - pattern: |
+          $DB.$QUERY(...)
+    message: "Direct database access in controller layer violates {{architecture}} architecture."
+    languages:
+      - {{primary_language}}
+    severity: WARNING
+    metadata:
+      category: architecture
+      confidence: LOW
