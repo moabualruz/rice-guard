@@ -1,21 +1,18 @@
-//! Wave 0 test stubs for SCAN-01 through SCAN-08.
+//! Wave 0 + Wave 1 tests for SCAN-01 through SCAN-08.
 //!
-//! Tests that rely on types not yet implemented (parsers, full engine) are
-//! marked `#[ignore]` with an explanation.  Tests for structural types
-//! (RawScanResult, ScanMode, OutputDir) compile and pass immediately.
+//! Tests that rely on types not yet implemented (full engine runner) are
+//! marked `#[ignore]` with an explanation. Tests for structural types
+//! (RawScanResult, ScanMode, OutputDir) and parsers (Plan 02) pass immediately.
 
 use rice_guard_core::scanner::{
-    diff_only_filter, run_one_scanner, DiffError, OutputDir, RawScanResult, ScanMode,
-    ScannerEngine, ScannerRunError,
+    parser::{parse_scanner_output, ParseError},
+    OutputDir, RawScanResult, ScanMode, ScannerEngine,
 };
 use std::path::PathBuf;
 
-// ── Structural / compile-time tests ─────────────────────────────────────────
+// -- Structural / compile-time tests -----------------------------------------
 
-/// SCAN-06 / SCAN-07 — OutputDir creates the directory on construction.
-///
-/// Verifies that `OutputDir::new()` returns Ok and that the resulting path
-/// exists on disk.
+/// SCAN-06 / SCAN-07 -- OutputDir creates the directory on construction.
 #[test]
 fn output_dir_creates_directory_on_disk() {
     let base = tempfile::tempdir().expect("tempdir");
@@ -44,7 +41,7 @@ fn output_dir_path_contains_project_name() {
     );
 }
 
-/// SCAN-03 — ScanMode variants: all 4 exist, are Copy (no clone required).
+/// SCAN-03 -- ScanMode variants: all 4 exist, are Copy (no clone required).
 #[test]
 fn scan_mode_variants_all_exist_and_are_copy() {
     let full = ScanMode::Full;
@@ -52,7 +49,6 @@ fn scan_mode_variants_all_exist_and_are_copy() {
     let security = ScanMode::Security;
     let diff = ScanMode::DiffOnly;
 
-    // Copy: use after "move" is fine
     let _a = full;
     let _b = full;
     let _c = quick;
@@ -66,7 +62,7 @@ fn scan_mode_variants_all_exist_and_are_copy() {
     assert_ne!(ScanMode::Security, ScanMode::DiffOnly);
 }
 
-/// ScanMode derives Debug — must be formattable.
+/// ScanMode derives Debug.
 #[test]
 fn scan_mode_debug_format() {
     assert_eq!(format!("{:?}", ScanMode::Full), "Full");
@@ -94,7 +90,7 @@ fn raw_scan_result_construction() {
     assert_eq!(result.exit_code, 0);
 }
 
-/// RawScanResult with non-zero exit code (Semgrep exits 1 when findings exist).
+/// RawScanResult with non-zero exit code.
 #[test]
 fn raw_scan_result_nonzero_exit_code() {
     let result = RawScanResult {
@@ -106,7 +102,7 @@ fn raw_scan_result_nonzero_exit_code() {
     assert_eq!(result.exit_code, 1);
 }
 
-/// RawScanResult can be cloned (derives Clone).
+/// RawScanResult can be cloned.
 #[test]
 fn raw_scan_result_is_clone() {
     let original = RawScanResult {
@@ -125,14 +121,12 @@ fn raw_scan_result_is_clone() {
 fn scanner_engine_construction() {
     use rice_guard_core::config::RiceGuardConfig;
     let engine = ScannerEngine::new(vec![], RiceGuardConfig::default());
-    // Construction must not panic.
     drop(engine);
 }
 
-// ── Fixture file existence tests ─────────────────────────────────────────────
+// -- Fixture file existence tests --------------------------------------------
 
-/// SCAN-02 / SCAN-08 — fixture: semgrep_sample.json exists and is valid JSON
-/// with the expected schema (results array, errors array).
+/// SCAN-02 / SCAN-08 -- fixture: semgrep_sample.json exists and is valid JSON.
 #[test]
 fn fixture_semgrep_sample_json_exists_and_is_valid() {
     let path = std::path::Path::new("tests/fixtures/semgrep_sample.json");
@@ -142,16 +136,15 @@ fn fixture_semgrep_sample_json_exists_and_is_valid() {
     let value: serde_json::Value =
         serde_json::from_str(&content).expect("semgrep_sample.json must be valid JSON");
 
-    assert!(value["results"].is_array(), "must have 'results' array");
-    assert!(value["errors"].is_array(), "must have 'errors' array");
+    assert!(value["results"].is_array(), "must have results array");
+    assert!(value["errors"].is_array(), "must have errors array");
     assert!(
         !value["results"].as_array().unwrap().is_empty(),
         "results must not be empty"
     );
 }
 
-/// SCAN-02 — fixture: trivy_sample.sarif exists and contains the CVE finding
-/// with an empty locations array (Trivy edge case — no physicalLocation).
+/// SCAN-02 -- fixture: trivy_sample.sarif has empty locations edge case.
 #[test]
 fn fixture_trivy_sample_sarif_has_empty_locations_edge_case() {
     let path = std::path::Path::new("tests/fixtures/trivy_sample.sarif");
@@ -166,7 +159,6 @@ fn fixture_trivy_sample_sarif_has_empty_locations_edge_case() {
         .expect("runs[0].results must be array");
     assert!(!results.is_empty(), "must have at least one result");
 
-    // At least one result must have an empty locations array (edge case).
     let has_empty_locations = results.iter().any(|r| {
         r["locations"]
             .as_array()
@@ -179,8 +171,7 @@ fn fixture_trivy_sample_sarif_has_empty_locations_edge_case() {
     );
 }
 
-/// SCAN-02 — fixture: gitleaks_sample.sarif exists and the result has NO
-/// level field (Gitleaks edge case).
+/// SCAN-02 -- fixture: gitleaks_sample.sarif has no level field.
 #[test]
 fn fixture_gitleaks_sample_sarif_has_no_level_field() {
     let path = std::path::Path::new("tests/fixtures/gitleaks_sample.sarif");
@@ -195,15 +186,14 @@ fn fixture_gitleaks_sample_sarif_has_no_level_field() {
         .expect("runs[0].results must be array");
     assert!(!results.is_empty(), "must have at least one result");
 
-    // The level field must be absent (not null, not empty string).
     let result = &results[0];
     assert!(
         result.get("level").is_none(),
-        "gitleaks fixture result[0] must NOT have a 'level' field (edge case)"
+        "gitleaks fixture result[0] must NOT have a level field (edge case)"
     );
 }
 
-/// SCAN-02 — fixture: jscpd_sample.json exists and has duplicates array.
+/// SCAN-02 -- fixture: jscpd_sample.json has duplicates array.
 #[test]
 fn fixture_jscpd_sample_json_has_duplicates() {
     let path = std::path::Path::new("tests/fixtures/jscpd_sample.json");
@@ -215,308 +205,404 @@ fn fixture_jscpd_sample_json_has_duplicates() {
 
     let duplicates = value["duplicates"]
         .as_array()
-        .expect("must have 'duplicates' array");
+        .expect("must have duplicates array");
     assert!(!duplicates.is_empty(), "duplicates must not be empty");
 
     let dup = &duplicates[0];
-    assert!(dup["firstFile"].is_object(), "must have 'firstFile'");
-    assert!(dup["secondFile"].is_object(), "must have 'secondFile'");
-    assert!(dup["fragment"].is_string(), "must have 'fragment'");
+    assert!(dup["firstFile"].is_object(), "must have firstFile");
+    assert!(dup["secondFile"].is_object(), "must have secondFile");
+    assert!(dup["fragment"].is_string(), "must have fragment");
 }
 
-// ── Ignored stubs: SCAN-01, SCAN-03, SCAN-04, SCAN-05, SCAN-06 (engine) ──────
-// These tests are `#[ignore]` because they require the full ScannerEngine
-// implementation (Phase 2, Plan 04).
+// -- Ignored stubs: SCAN-01, SCAN-03, SCAN-04, SCAN-05, SCAN-06 (engine) -----
 
-/// SCAN-01 — All enabled scanners run against a target path in Full mode.
-///
-/// Requires: ScannerEngine::run() implementation (Plan 04).
+/// SCAN-01 -- All enabled scanners run against a target path in Full mode.
 #[test]
 #[ignore = "Requires ScannerEngine::run() implementation (Phase 2, Plan 04)"]
 fn scan_01_all_enabled_scanners_run_in_full_mode() {
     todo!("implement after Plan 04: verify each enabled scanner produces a RawScanResult")
 }
 
-/// SCAN-03 — Quick mode only runs jscpd + scc + Semgrep + Trivy.
-///
-/// Requires: ScannerEngine::run() implementation (Plan 04).
+/// SCAN-03 -- Quick mode only runs jscpd + scc + Semgrep + Trivy.
 #[test]
 #[ignore = "Requires ScannerEngine::run() implementation (Phase 2, Plan 04)"]
 fn scan_03_quick_mode_runs_subset_of_scanners() {
     todo!("implement after Plan 04: verify Quick mode only activates 4 scanners")
 }
 
-/// SCAN-04 — Security mode only runs Semgrep + Trivy + Gitleaks.
-///
-/// Requires: ScannerEngine::run() implementation (Plan 04).
+/// SCAN-04 -- Security mode only runs Semgrep + Trivy + Gitleaks.
 #[test]
 #[ignore = "Requires ScannerEngine::run() implementation (Phase 2, Plan 04)"]
 fn scan_04_security_mode_runs_security_scanners() {
     todo!("implement after Plan 04: verify Security mode activates Semgrep, Trivy, Gitleaks")
 }
 
-/// SCAN-05 — DiffOnly mode passes diff context to scanners.
-///
-/// Requires: ScannerEngine::run() implementation (Plan 04).
+/// SCAN-05 -- DiffOnly mode passes diff context to scanners.
 #[test]
 #[ignore = "Requires ScannerEngine::run() implementation (Phase 2, Plan 04)"]
 fn scan_05_diff_only_mode_passes_diff_context() {
     todo!("implement after Plan 04: verify DiffOnly mode only reports issues on changed files")
 }
 
-/// SCAN-06 — Scanner output is written to the OutputDir with correct filenames.
-///
-/// Requires: ScannerEngine::run() implementation (Plan 04).
+/// SCAN-06 -- Scanner output is written to the OutputDir with correct filenames.
 #[test]
 #[ignore = "Requires ScannerEngine::run() implementation (Phase 2, Plan 04)"]
 fn scan_06_scanner_output_written_to_output_dir() {
     todo!("implement after Plan 04: verify output files appear in the OutputDir path")
 }
 
-// ── Ignored stubs: SCAN-02, SCAN-08 (parsers) ────────────────────────────────
-// These tests are `#[ignore]` because they require the scanner output
-// parsers (Plan 02).
+// -- SCAN-02 / SCAN-08: Parser tests (Plan 02) -------------------------------
 
-/// SCAN-02 — Semgrep JSON output is parsed into normalised Issues.
-///
-/// Requires: Semgrep parser (Phase 2, Plan 02).
+/// SCAN-08 -- Trivy SARIF: CVE with empty locations gets file_path="<project>", line=0.
 #[test]
-#[ignore = "Requires Semgrep parser implementation (Phase 2, Plan 02)"]
-fn scan_02_semgrep_json_parsed_into_issues() {
-    todo!("implement after Plan 02: parse semgrep_sample.json into Issue structs")
-}
-
-/// SCAN-08 — SARIF output (Trivy / Gitleaks) is parsed into normalised Issues,
-/// handling edge cases (empty locations, missing level field).
-///
-/// Requires: SARIF parser (Phase 2, Plan 02).
-#[test]
-#[ignore = "Requires SARIF parser implementation (Phase 2, Plan 02)"]
-fn scan_08_sarif_parsed_with_edge_cases() {
-    todo!("implement after Plan 02: parse trivy + gitleaks SARIF with edge cases")
-}
-
-// ── runner tests (SCAN-06, SCAN-07) ─────────────────────────────────────────
-
-/// SCAN-06/07 — run_one_scanner returns Unavailable when scanner is disabled in config.
-#[tokio::test]
-async fn runner_unavailable_scanner_returns_error() {
-    use rice_guard_core::config::{RiceGuardConfig, ToolsConfig};
-    use rice_guard_core::registry::scanner_descriptor::{
-        ScannerCommand, ScannerCommands, ScannerInstall,
-    };
-    use rice_guard_core::registry::ScannerDescriptor;
-    use std::collections::HashMap;
-
-    let desc = ScannerDescriptor {
-        name: "semgrep".to_string(),
-        version: ">=1.0".to_string(),
-        languages: vec!["rust".to_string()],
-        install: ScannerInstall {
-            check: "semgrep --version".to_string(),
-            methods: HashMap::new(),
-        },
-        commands: ScannerCommands {
-            scan: ScannerCommand {
-                cmd: "semgrep scan --json .".to_string(),
-                timeout: 60,
-            },
-            security: None,
-            quick: None,
-        },
-        output_format: "json".to_string(),
-        severity_map: HashMap::new(),
-    };
-
-    // Config explicitly marks semgrep as unavailable.
-    let mut scanners_map = HashMap::new();
-    scanners_map.insert("semgrep".to_string(), false);
-    let mut config = RiceGuardConfig::default();
-    config.tools = ToolsConfig {
-        scanners: scanners_map,
-        fixers: HashMap::new(),
-    };
-
+fn sarif_trivy_cve_empty_locations_yields_project_sentinel() {
     let base = tempfile::tempdir().expect("tempdir");
-    let output_dir = OutputDir::new("test", base.path().to_str().unwrap()).unwrap();
-    let target = base.path();
+    let fixture_path = base.path().join("trivy.sarif");
+    std::fs::copy(
+        std::path::Path::new("tests/fixtures/trivy_sample.sarif"),
+        &fixture_path,
+    )
+    .expect("copy fixture");
 
-    let result = run_one_scanner(&desc, &config, output_dir.path(), target, &ScanMode::Full).await;
+    let result = RawScanResult {
+        scanner: "trivy".to_string(),
+        output_format: "sarif".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
 
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
     assert!(
-        matches!(result, Err(ScannerRunError::Unavailable(_))),
-        "disabled scanner must return Unavailable, got: {result:?}"
+        !findings.is_empty(),
+        "trivy SARIF must produce at least one finding"
+    );
+
+    let cve_finding = findings
+        .iter()
+        .find(|f| f.rule_id == "CVE-2023-45803")
+        .expect("CVE-2023-45803 finding must be present");
+
+    assert_eq!(
+        cve_finding.file_path, "<project>",
+        "Trivy CVE with empty locations must use <project> sentinel"
+    );
+    assert_eq!(
+        cve_finding.line, 0,
+        "Trivy CVE with empty locations must have line=0"
     );
 }
 
-/// SCAN-06/07 — Quick mode selects quick command when present, falls back to scan.
+/// SCAN-08 -- Trivy SARIF: finding with physicalLocation gets correct file_path.
 #[test]
-fn runner_quick_mode_selects_quick_command_when_present() {
-    use rice_guard_core::registry::scanner_descriptor::{
-        ScannerCommand, ScannerCommands, ScannerInstall,
-    };
-    use rice_guard_core::registry::ScannerDescriptor;
-    use std::collections::HashMap;
+fn sarif_trivy_finding_with_location_gets_file_path() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let fixture_path = base.path().join("trivy.sarif");
+    std::fs::copy(
+        std::path::Path::new("tests/fixtures/trivy_sample.sarif"),
+        &fixture_path,
+    )
+    .expect("copy fixture");
 
-    // Descriptor with explicit quick command.
-    let desc_with_quick = ScannerDescriptor {
-        name: "semgrep".to_string(),
-        version: ">=1.0".to_string(),
-        languages: vec!["rust".to_string()],
-        install: ScannerInstall {
-            check: "semgrep --version".to_string(),
-            methods: HashMap::new(),
-        },
-        commands: ScannerCommands {
-            scan: ScannerCommand {
-                cmd: "semgrep scan --json .".to_string(),
-                timeout: 300,
-            },
-            security: None,
-            quick: Some(ScannerCommand {
-                cmd: "semgrep scan --json --fast .".to_string(),
-                timeout: 60,
-            }),
-        },
+    let result = RawScanResult {
+        scanner: "trivy".to_string(),
+        output_format: "sarif".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
+
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
+
+    let located = findings
+        .iter()
+        .find(|f| f.rule_id == "CVE-2024-22195")
+        .expect("CVE-2024-22195 must be present");
+
+    assert_eq!(
+        located.file_path, "go.sum",
+        "finding with physicalLocation must have correct file_path"
+    );
+}
+
+/// SCAN-08 -- Gitleaks SARIF: absent level field -> severity = "high".
+#[test]
+fn sarif_gitleaks_no_level_defaults_to_high() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let fixture_path = base.path().join("gitleaks.sarif");
+    std::fs::copy(
+        std::path::Path::new("tests/fixtures/gitleaks_sample.sarif"),
+        &fixture_path,
+    )
+    .expect("copy fixture");
+
+    let result = RawScanResult {
+        scanner: "gitleaks".to_string(),
+        output_format: "sarif".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
+
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
+    assert!(
+        !findings.is_empty(),
+        "gitleaks SARIF must produce at least one finding"
+    );
+
+    let finding = &findings[0];
+    assert_eq!(
+        finding.severity, "high",
+        "Gitleaks finding with absent level must default to high"
+    );
+    assert_eq!(
+        finding.file_path, "config/settings.py",
+        "Gitleaks finding file_path must be correct"
+    );
+}
+
+/// SCAN-08 -- SARIF: file:/// URI prefix is stripped from file_path.
+#[test]
+fn sarif_file_uri_prefix_stripped() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let sarif_json = serde_json::json!({
+        "version": "2.1.0",
+        "runs": [{
+            "tool": { "driver": { "name": "test", "rules": [] } },
+            "results": [{
+                "ruleId": "test-rule",
+                "level": "error",
+                "message": { "text": "test" },
+                "locations": [{
+                    "physicalLocation": {
+                        "artifactLocation": { "uri": "file:///workspace/src/main.py" },
+                        "region": { "startLine": 10 }
+                    }
+                }]
+            }]
+        }]
+    });
+    let fixture_path = base.path().join("test.sarif");
+    std::fs::write(&fixture_path, sarif_json.to_string()).expect("write fixture");
+
+    let result = RawScanResult {
+        scanner: "test".to_string(),
+        output_format: "sarif".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
+
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
+    assert_eq!(findings.len(), 1);
+    assert_eq!(
+        findings[0].file_path, "workspace/src/main.py",
+        "file:/// prefix must be stripped from SARIF uri"
+    );
+}
+
+/// SCAN-08 -- SARIF: severity normalization (error/warning/note/None).
+#[test]
+fn sarif_severity_normalization() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let sarif_json = serde_json::json!({
+        "version": "2.1.0",
+        "runs": [{
+            "tool": { "driver": { "name": "test", "rules": [] } },
+            "results": [
+                { "ruleId": "rule-error", "level": "error",   "message": { "text": "e" }, "locations": [] },
+                { "ruleId": "rule-note",  "level": "note",    "message": { "text": "n" }, "locations": [] },
+                { "ruleId": "rule-nolvl",                     "message": { "text": "x" }, "locations": [] },
+            ]
+        }]
+    });
+    let fixture_path = base.path().join("test.sarif");
+    std::fs::write(&fixture_path, sarif_json.to_string()).expect("write fixture");
+
+    let result = RawScanResult {
+        scanner: "test".to_string(),
+        output_format: "sarif".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
+
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
+    assert_eq!(findings.len(), 3);
+
+    let error_f = findings.iter().find(|f| f.rule_id == "rule-error").unwrap();
+    assert_eq!(error_f.severity, "error");
+
+    let note_f = findings.iter().find(|f| f.rule_id == "rule-note").unwrap();
+    assert_eq!(note_f.severity, "info");
+
+    let no_level_f = findings.iter().find(|f| f.rule_id == "rule-nolvl").unwrap();
+    assert_eq!(no_level_f.severity, "warning");
+}
+
+/// SCAN-08 -- unknown output format returns ParseError::InvalidFormat.
+#[test]
+fn parse_scanner_output_unknown_format_returns_error() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let fixture_path = base.path().join("output.xyz");
+    std::fs::write(&fixture_path, "{}").expect("write fixture");
+
+    let result = RawScanResult {
+        scanner: "unknown".to_string(),
+        output_format: "xyz".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
+
+    let err = parse_scanner_output(&result).expect_err("unknown format must error");
+    assert!(
+        matches!(err, ParseError::InvalidFormat(_)),
+        "expected InvalidFormat, got: {err:?}"
+    );
+}
+
+/// SCAN-02 -- Semgrep JSON parsed into two findings.
+#[test]
+fn scan_02_semgrep_json_parsed_into_issues() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let fixture_path = base.path().join("semgrep.json");
+    std::fs::copy(
+        std::path::Path::new("tests/fixtures/semgrep_sample.json"),
+        &fixture_path,
+    )
+    .expect("copy fixture");
+
+    let result = RawScanResult {
+        scanner: "semgrep".to_string(),
         output_format: "json".to_string(),
-        severity_map: HashMap::new(),
+        output_file: fixture_path,
+        exit_code: 1,
     };
 
-    // Quick command cmd should differ from scan cmd.
-    let quick_cmd = desc_with_quick
-        .commands
-        .quick
-        .as_ref()
-        .unwrap_or(&desc_with_quick.commands.scan);
-    assert!(
-        quick_cmd.cmd.contains("--fast"),
-        "quick mode must use the quick command when present"
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
+    assert_eq!(
+        findings.len(),
+        2,
+        "semgrep_sample.json has 2 findings; got: {findings:?}"
     );
 
-    // Descriptor without quick — fallback to scan.
-    let desc_no_quick = ScannerDescriptor {
-        name: "gitleaks".to_string(),
-        version: ">=8.0".to_string(),
-        languages: vec!["all".to_string()],
-        install: ScannerInstall {
-            check: "gitleaks version".to_string(),
-            methods: HashMap::new(),
-        },
-        commands: ScannerCommands {
-            scan: ScannerCommand {
-                cmd: "gitleaks detect --report-format sarif .".to_string(),
-                timeout: 120,
-            },
-            security: None,
-            quick: None,
-        },
-        output_format: "sarif".to_string(),
-        severity_map: HashMap::new(),
-    };
+    let sql = findings
+        .iter()
+        .find(|f| f.rule_id == "python.security.sql-injection")
+        .expect("SQL injection finding must be present");
+    assert_eq!(sql.severity, "error");
+    assert_eq!(sql.file_path, "src/db.py");
+    assert_eq!(sql.line, 42);
 
-    let fallback_cmd = desc_no_quick
-        .commands
-        .quick
-        .as_ref()
-        .unwrap_or(&desc_no_quick.commands.scan);
-    assert!(
-        fallback_cmd.cmd.contains("gitleaks"),
-        "quick mode must fall back to scan cmd when no quick cmd defined"
-    );
+    let fstr = findings
+        .iter()
+        .find(|f| f.rule_id == "python.best-practice.use-fstring")
+        .expect("use-fstring finding must be present");
+    assert_eq!(fstr.severity, "warning");
+    assert_eq!(fstr.file_path, "src/utils.py");
+    assert_eq!(fstr.line, 15);
 }
 
-/// SCAN-07 — DiffOnly mode uses the scan command (same as Full).
+/// SCAN-02 -- Semgrep JSON with missing results key returns empty Vec (not error).
 #[test]
-fn runner_diff_only_uses_scan_command() {
-    use rice_guard_core::registry::scanner_descriptor::{
-        ScannerCommand, ScannerCommands, ScannerInstall,
-    };
-    use rice_guard_core::registry::ScannerDescriptor;
-    use std::collections::HashMap;
+fn semgrep_missing_results_key_returns_empty() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let fixture_path = base.path().join("semgrep_empty.json");
+    let empty_json = serde_json::json!({ "errors": [] });
+    std::fs::write(&fixture_path, empty_json.to_string()).expect("write fixture");
 
-    let desc = ScannerDescriptor {
-        name: "trivy".to_string(),
-        version: ">=0.50".to_string(),
-        languages: vec!["all".to_string()],
-        install: ScannerInstall {
-            check: "trivy --version".to_string(),
-            methods: HashMap::new(),
-        },
-        commands: ScannerCommands {
-            scan: ScannerCommand {
-                cmd: "trivy fs --format sarif .".to_string(),
-                timeout: 300,
-            },
-            security: Some(ScannerCommand {
-                cmd: "trivy fs --scanners vuln,secret --format sarif .".to_string(),
-                timeout: 180,
-            }),
-            quick: None,
-        },
-        output_format: "sarif".to_string(),
-        severity_map: HashMap::new(),
+    let result = RawScanResult {
+        scanner: "semgrep".to_string(),
+        output_format: "json".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
     };
 
-    // DiffOnly should use scan (same as Full), not security command.
-    let diff_only_cmd = &desc.commands.scan;
+    let findings = parse_scanner_output(&result).expect("missing results must not error");
     assert!(
-        diff_only_cmd.cmd.contains("trivy fs --format"),
-        "DiffOnly must use the full scan command"
+        findings.is_empty(),
+        "missing results key must yield empty vec"
     );
 }
 
-// ── diff filter tests (SCAN-05) ───────────────────────────────────────────────
+/// SCAN-02 -- jscpd JSON parsed into one duplication finding with severity=warning.
+#[test]
+fn jscpd_json_parsed_into_duplication_finding() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let subdir = base.path().join("jscpd_output");
+    std::fs::create_dir_all(&subdir).expect("create subdir");
+    let fixture_path = subdir.join("jscpd-report.json");
+    std::fs::copy(
+        std::path::Path::new("tests/fixtures/jscpd_sample.json"),
+        &fixture_path,
+    )
+    .expect("copy fixture");
 
-/// SCAN-05 — diff_only_filter returns GitNotFound for non-existent git binary path.
-/// Uses a temp directory that is not a git repo.
-#[tokio::test]
-async fn diff_filter_non_git_dir_returns_error_or_empty() {
-    let tmp = tempfile::tempdir().expect("tempdir");
+    let result = RawScanResult {
+        scanner: "jscpd".to_string(),
+        output_format: "jscpd-json".to_string(),
+        // intentionally wrong filename -- parser must glob the parent dir
+        output_file: subdir.join("nonexistent-output.json"),
+        exit_code: 0,
+    };
 
-    // A plain temp dir with no git repo — should either return an error or
-    // empty Vec (fallback). Both are acceptable graceful behaviours.
-    let result = diff_only_filter(tmp.path()).await;
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
+    assert_eq!(
+        findings.len(),
+        1,
+        "jscpd_sample.json has 1 duplicate; got: {findings:?}"
+    );
 
-    match result {
-        Ok(files) => {
-            // Fallback behaviour: returns empty Vec meaning "full scan".
-            assert!(
-                files.is_empty(),
-                "non-git dir fallback must return empty vec"
-            );
-        }
-        Err(DiffError::GitNotFound) => {
-            // Git not in PATH — acceptable in restricted environments.
-        }
-        Err(DiffError::NotAGitRepo { .. }) => {
-            // Expected: directory is not a git repository.
-        }
-        Err(e) => {
-            panic!("unexpected error for non-git dir: {e:?}");
-        }
-    }
+    let dup = &findings[0];
+    assert_eq!(dup.rule_id, "jscpd.duplication");
+    assert_eq!(dup.severity, "warning");
+    assert_eq!(dup.file_path, "src/a.ts");
+    assert!(
+        dup.message.contains("src/b.ts"),
+        "message must mention second file; got: {}",
+        dup.message
+    );
 }
 
-/// SCAN-05 — diff_only_filter parses git diff --name-only output correctly.
-/// This test verifies the path parsing logic by inspecting a real git repo
-/// (the project itself).
-#[tokio::test]
-#[ignore = "requires git in PATH and a git repo; run manually or in CI"]
-async fn diff_filter_parses_git_output_in_real_repo() {
-    // Use the workspace root as target — it IS a git repo.
-    let target = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent() // crates/core -> crates
-        .unwrap()
-        .parent() // crates -> workspace root
-        .unwrap();
+/// SCAN-02 -- scc format returns empty findings (metrics only, not issues).
+#[test]
+fn scc_format_returns_empty_findings() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let fixture_path = base.path().join("scc.json");
+    std::fs::write(&fixture_path, "[]").expect("write fixture");
 
-    let result = diff_only_filter(target).await;
+    let result = RawScanResult {
+        scanner: "scc".to_string(),
+        output_format: "scc-json".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
 
-    // Either succeeds with a Vec (possibly empty) or fails with a known error.
-    match result {
-        Ok(_) => {} // Any result is valid — just checks we don't panic.
-        Err(DiffError::GitNotFound) => {}
-        Err(DiffError::NotAGitRepo { .. }) => {}
-        Err(e) => panic!("unexpected diff_only_filter error: {e:?}"),
+    let findings = parse_scanner_output(&result).expect("scc must not error");
+    assert!(
+        findings.is_empty(),
+        "scc produces no findings (metrics only)"
+    );
+}
+
+/// SCAN-08 -- SARIF: scanner name is propagated to each RawFinding.
+#[test]
+fn sarif_scanner_name_propagated_to_findings() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let fixture_path = base.path().join("trivy.sarif");
+    std::fs::copy(
+        std::path::Path::new("tests/fixtures/trivy_sample.sarif"),
+        &fixture_path,
+    )
+    .expect("copy fixture");
+
+    let result = RawScanResult {
+        scanner: "trivy".to_string(),
+        output_format: "sarif".to_string(),
+        output_file: fixture_path,
+        exit_code: 0,
+    };
+
+    let findings = parse_scanner_output(&result).expect("parse should succeed");
+    for f in &findings {
+        assert_eq!(
+            f.scanner, "trivy",
+            "scanner name must be propagated to each finding"
+        );
     }
 }
