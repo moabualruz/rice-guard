@@ -34,7 +34,20 @@ impl IssueBuilder {
             finding.line,
             project_root,
         );
+        Self::build_with_evidence(finding, evidence, file_freq)
+    }
 
+    /// Construct an [`Issue`] using a pre-extracted [`EvidenceBlock`].
+    ///
+    /// Used by the scan CLI when evidence is extracted in bulk via
+    /// [`EvidenceExtractor::extract_file`] (one parse per file, EVID-04).
+    ///
+    /// `file_freq` is the number of findings in the same file (for WSJF scoring).
+    pub fn build_with_evidence(
+        finding: &RawFinding,
+        evidence: super::EvidenceBlock,
+        file_freq: u32,
+    ) -> Issue {
         let fix = FixMetadata::from_finding(
             &finding.scanner,
             &finding.rule_id,
