@@ -1,0 +1,30 @@
+[package]
+name = "rice-guard"
+description = "Cross-platform code quality, security scanning, and deterministic auto-fixing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "rice-guard"
+path = "src/main.rs"
+
+[dependencies]
+rice-guard-core.workspace = true
+clap.workspace = true
+clap_complete.workspace = true
+inquire.workspace = true
+indicatif.workspace = true
+owo-colors.workspace = true
+atty.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true
+tempfile.workspace = true

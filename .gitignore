@@ -1,0 +1,58 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# rice-guard config (generated per project — not committed)
+.riceguard.yaml
+*.riceguard.yaml.bak
+
+# Cargo lock — include for binaries, exclude for libraries
+# This is a binary project, so we track Cargo.lock
+# (Do NOT add Cargo.lock here)
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Reports (generated output)
+reports/
+
+# Test artifacts
+test-results/
+
+# ── AI Agent Files ──────────────────────────────────────────
+# Root-level loader files are VERSION CONTROLLED:
+#   CLAUDE.md, GEMINI.md, AGENTS.md (slim — just @imports)
+# Shared instruction content lives in .ai/instructions/ (gitignored).
+# Agent tool directories are gitignored (personal session state).
+# All tools read via direct path lookup — gitignore does NOT block agents.
+
+# Shared agent instructions (loaded via @imports from root loader files)
+.ai/
+.planning/
+
+# Claude Code: personal overrides + session artifacts only.
+.claude/
+
+# Gemini CLI workspace (personal session data)
+.gemini/
+
+# Cursor AI workspace (personal session data)
+.cursor/
+
+# Generic agent workspace (session plans, memory)
+.agent/
