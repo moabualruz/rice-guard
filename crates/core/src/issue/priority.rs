@@ -17,7 +17,11 @@
 //! | `file_freq`      | min(findings in file, 10) × 1 (capped at 10)                    |
 //! | `cross_file`     | true → -10 penalty                                               |
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
+
+use crate::scanner::parser::RawFinding;
 
 /// Priority level derived from WSJF scoring.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -75,6 +79,25 @@ pub fn priority_level(score: i32) -> PriorityLevel {
         s if s >= 20 => PriorityLevel::Medium,
         _ => PriorityLevel::Low,
     }
+}
+
+/// Count how many findings exist per file path.
+///
+/// Returns a map of `file_path -> count` across all provided findings.
+/// Used to populate the `file_freq` argument to [`wsjf_score`].
+pub fn file_freq_map(findings: &[RawFinding]) -> HashMap<String, u32> {
+    let mut map = HashMap::new();
+    for finding in findings {
+        *map.entry(finding.file_path.clone()).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Sort a slice of [`super::Issue`] by `priority_score` descending (highest first).
+///
+/// Issues with equal scores retain their original relative order (stable sort).
+pub fn sort_issues(issues: &mut Vec<super::Issue>) {
+    issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
 }
 
 #[cfg(test)]
