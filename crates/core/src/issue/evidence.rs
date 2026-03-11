@@ -8,11 +8,16 @@
 //! - `matched_code` — the flagged code snippet (from scanner or line-window)
 //! - `context_before` — lines before the finding
 //! - `context_after` — lines after the finding
-//! - `enclosing_function` — function/method name extracted via tree-sitter (Phase 3, Plan 02)
-//! - `enclosing_class` — class/struct name extracted via tree-sitter (Phase 3, Plan 02)
-//! - `imports` — file-level import statements extracted via tree-sitter (Phase 3, Plan 02)
+//! - `enclosing_function` — function/method name extracted via tree-sitter
+//! - `enclosing_class` — class/struct name extracted via tree-sitter
+//! - `imports` — file-level import statements extracted via tree-sitter
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::Path;
+use tree_sitter::{Language, Node, Parser};
+
+use crate::scanner::parser::RawFinding;
 
 /// Pre-embedded code evidence for a finding.
 ///
@@ -68,10 +73,369 @@ impl EvidenceBlock {
 /// Number of context lines to include above and below the finding line.
 pub const CONTEXT_LINES: usize = 5;
 
+// ── Line-number conversion ────────────────────────────────────────────────────
+
+/// Convert a 1-based SARIF line number to a 0-based Vec index.
+///
+/// Called exactly once at the evidence extraction boundary to avoid
+/// off-by-one errors (see RESEARCH.md Pitfall 2).
+#[inline]
+fn line_to_index(line: u32) -> usize {
+    line.saturating_sub(1) as usize
+}
+
+/// Extract context lines and matched code from `source` given a 1-based line.
+///
+/// Returns `(matched_line, context_before, context_after)`.
+/// - `matched_line` is the source line at `line` (empty string if out-of-range)
+/// - `context_before` contains up to `window` lines before the finding
+/// - `context_after` contains up to `window` lines after the finding
+fn extract_context(source: &str, line: u32, window: usize) -> (String, Vec<String>, Vec<String>) {
+    let lines: Vec<&str> = source.lines().collect();
+    let idx = line_to_index(line);
+
+    let matched = lines.get(idx).map(|s| s.to_string()).unwrap_or_default();
+
+    let before_start = idx.saturating_sub(window);
+    let before: Vec<String> = lines[before_start..idx.min(lines.len())]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    let after_end = (idx + 1 + window).min(lines.len());
+    let after: Vec<String> = if idx < lines.len() {
+        lines[(idx + 1).min(lines.len())..after_end]
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    } else {
+        vec![]
+    };
+
+    (matched, before, after)
+}
+
+// ── LanguageNodeKinds ─────────────────────────────────────────────────────────
+
+/// Per-language AST node kind names for evidence extraction.
+///
+/// Each language uses different node kind strings in tree-sitter; this struct
+/// holds the relevant kinds for function/class scope detection and import
+/// extraction.
+pub struct LanguageNodeKinds {
+    /// Node kinds that represent function or method definitions.
+    pub function_kinds: &'static [&'static str],
+    /// Node kinds that represent class, struct, trait, or interface definitions.
+    pub class_kinds: &'static [&'static str],
+    /// Node kinds that represent import/use/require statements at file scope.
+    pub import_kinds: &'static [&'static str],
+}
+
+/// Return the [`LanguageNodeKinds`] for a given file extension.
+///
+/// Returns `None` for unsupported extensions.
+fn language_node_kinds(ext: &str) -> Option<LanguageNodeKinds> {
+    match ext {
+        "py" => Some(LanguageNodeKinds {
+            function_kinds: &["function_definition"],
+            class_kinds: &["class_definition"],
+            import_kinds: &["import_statement", "import_from_statement"],
+        }),
+        "rs" => Some(LanguageNodeKinds {
+            function_kinds: &["function_item"],
+            class_kinds: &["struct_item", "impl_item", "trait_item"],
+            import_kinds: &["use_declaration"],
+        }),
+        "go" => Some(LanguageNodeKinds {
+            function_kinds: &["function_declaration", "method_declaration"],
+            class_kinds: &["type_declaration"],
+            import_kinds: &["import_declaration"],
+        }),
+        "js" | "jsx" | "mjs" | "cjs" => Some(LanguageNodeKinds {
+            function_kinds: &[
+                "function_declaration",
+                "arrow_function",
+                "method_definition",
+            ],
+            class_kinds: &["class_declaration"],
+            import_kinds: &["import_statement"],
+        }),
+        "ts" | "tsx" => Some(LanguageNodeKinds {
+            function_kinds: &[
+                "function_declaration",
+                "arrow_function",
+                "method_definition",
+            ],
+            class_kinds: &["class_declaration"],
+            import_kinds: &["import_statement"],
+        }),
+        "java" => Some(LanguageNodeKinds {
+            function_kinds: &["method_declaration"],
+            class_kinds: &["class_declaration"],
+            import_kinds: &["import_declaration"],
+        }),
+        "kt" => Some(LanguageNodeKinds {
+            function_kinds: &["function_declaration"],
+            class_kinds: &["class_declaration"],
+            import_kinds: &["import_header"],
+        }),
+        "php" => Some(LanguageNodeKinds {
+            function_kinds: &["function_definition"],
+            class_kinds: &["class_declaration"],
+            import_kinds: &["namespace_use_declaration"],
+        }),
+        "cs" => Some(LanguageNodeKinds {
+            function_kinds: &["method_declaration"],
+            class_kinds: &["class_declaration"],
+            import_kinds: &["using_directive"],
+        }),
+        "rb" => Some(LanguageNodeKinds {
+            function_kinds: &["method", "singleton_method"],
+            class_kinds: &["class", "module"],
+            import_kinds: &["call"],
+        }),
+        "sh" | "bash" => Some(LanguageNodeKinds {
+            function_kinds: &["function_definition"],
+            class_kinds: &[],
+            import_kinds: &["command"],
+        }),
+        "dart" => Some(LanguageNodeKinds {
+            function_kinds: &["function_signature", "method_signature"],
+            class_kinds: &["class_definition"],
+            import_kinds: &["import_or_export"],
+        }),
+        _ => None,
+    }
+}
+
+// ── Tree-sitter AST walking helpers ──────────────────────────────────────────
+
+/// Walk ancestors of the node covering `line` (0-based) looking for any node
+/// whose kind is in `kinds`. Returns the text of the first matching ancestor's
+/// identifier child, or `None`.
+fn find_enclosing_by_kinds(
+    root: Node<'_>,
+    line: usize,
+    kinds: &[&str],
+    source_bytes: &[u8],
+) -> Option<String> {
+    if kinds.is_empty() {
+        return None;
+    }
+    // Find the deepest node that covers the target line (column=0).
+    let point = tree_sitter::Point {
+        row: line,
+        column: 0,
+    };
+    let leaf = root.descendant_for_point_range(point, point)?;
+
+    // Walk from leaf up to root looking for a node of the desired kind.
+    let mut cursor = leaf;
+    loop {
+        if kinds.contains(&cursor.kind()) {
+            // Extract the name from an identifier or name child.
+            let mut child_cursor = cursor.walk();
+            for child in cursor.children(&mut child_cursor) {
+                if matches!(child.kind(), "identifier" | "name" | "simple_identifier") {
+                    if let Ok(text) = child.utf8_text(source_bytes) {
+                        if !text.is_empty() {
+                            return Some(text.to_string());
+                        }
+                    }
+                }
+            }
+            // If no named identifier child, return the node text itself (trimmed).
+            if let Ok(text) = cursor.utf8_text(source_bytes) {
+                let snippet: String = text.chars().take(80).collect();
+                let first_line = snippet.lines().next().unwrap_or("").trim().to_string();
+                if !first_line.is_empty() {
+                    return Some(first_line);
+                }
+            }
+            return None;
+        }
+        match cursor.parent() {
+            Some(p) => cursor = p,
+            None => break,
+        }
+    }
+    None
+}
+
+/// Collect text of all direct children of `root` whose kind is in `kinds`.
+fn extract_imports_from_tree(root: Node<'_>, source_bytes: &[u8], kinds: &[&str]) -> Vec<String> {
+    if kinds.is_empty() {
+        return vec![];
+    }
+    let mut imports = Vec::new();
+    let mut cursor = root.walk();
+    for child in root.children(&mut cursor) {
+        if kinds.contains(&child.kind()) {
+            if let Ok(text) = child.utf8_text(source_bytes) {
+                let s = text.trim().to_string();
+                if !s.is_empty() {
+                    imports.push(s);
+                }
+            }
+        }
+    }
+    imports
+}
+
+// ── EvidenceExtractor ─────────────────────────────────────────────────────────
+
+/// Extracts evidence blocks for scanner findings using line-number math
+/// (matched_code + context_before/after) and tree-sitter AST walking
+/// (enclosing_function, enclosing_class, imports).
+///
+/// ## File-grouping (EVID-04)
+///
+/// All findings for a file are processed from a single parse tree
+/// (`extract_file`). Callers should group findings by `file_path` and call
+/// `extract_file` once per file.
+pub struct EvidenceExtractor {
+    /// Map from file extension → tree-sitter Language
+    language_registry: HashMap<String, Language>,
+}
+
+impl EvidenceExtractor {
+    /// Build a new `EvidenceExtractor` with all available language grammars.
+    pub fn new() -> Self {
+        let mut registry: HashMap<String, Language> = HashMap::new();
+
+        macro_rules! register {
+            ($ext:expr, $lang_fn:expr) => {
+                registry.insert($ext.to_string(), Language::new($lang_fn));
+            };
+        }
+
+        register!("py", tree_sitter_python::LANGUAGE);
+        register!("rs", tree_sitter_rust::LANGUAGE);
+        register!("go", tree_sitter_go::LANGUAGE);
+        register!("js", tree_sitter_javascript::LANGUAGE);
+        register!("jsx", tree_sitter_javascript::LANGUAGE);
+        register!("mjs", tree_sitter_javascript::LANGUAGE);
+        register!("cjs", tree_sitter_javascript::LANGUAGE);
+        register!("ts", tree_sitter_typescript::LANGUAGE_TYPESCRIPT);
+        register!("tsx", tree_sitter_typescript::LANGUAGE_TSX);
+        register!("java", tree_sitter_java::LANGUAGE);
+        register!("php", tree_sitter_php::LANGUAGE_PHP);
+        register!("cs", tree_sitter_c_sharp::LANGUAGE);
+        register!("rb", tree_sitter_ruby::LANGUAGE);
+        register!("sh", tree_sitter_bash::LANGUAGE);
+        register!("bash", tree_sitter_bash::LANGUAGE);
+
+        #[cfg(feature = "full-grammars")]
+        {
+            register!("dart", tree_sitter_dart::LANGUAGE);
+            register!("kt", tree_sitter_kotlin::LANGUAGE);
+        }
+
+        Self {
+            language_registry: registry,
+        }
+    }
+
+    /// Extract the context lines (matched_code, context_before, context_after)
+    /// for a single finding using only line-number arithmetic.
+    ///
+    /// Tree-sitter fields (enclosing_function, enclosing_class, imports) are
+    /// not populated here — use `extract_file` for the full evidence block.
+    pub fn extract_line_context(
+        &self,
+        raw: &RawFinding,
+        source: &str,
+    ) -> (String, Vec<String>, Vec<String>) {
+        let (source_line, before, after) = extract_context(source, raw.line, CONTEXT_LINES);
+        let matched_code = raw
+            .matched_code
+            .clone()
+            .unwrap_or_else(|| source_line.clone());
+        (matched_code, before, after)
+    }
+
+    /// Parse `source` for the given file extension. Returns `None` if the
+    /// extension is unsupported or parsing fails (graceful degradation).
+    fn parse_source(&self, ext: &str, source: &str) -> Option<tree_sitter::Tree> {
+        let lang = self.language_registry.get(ext)?;
+        let mut parser = Parser::new();
+        parser.set_language(lang).ok()?;
+        parser.parse(source.as_bytes(), None)
+    }
+
+    /// Extract evidence for all `findings` in a single file.
+    ///
+    /// The source file is parsed exactly **once** (EVID-04). All queries
+    /// (enclosing function/class, imports) are answered from that single tree.
+    ///
+    /// Returns a map keyed by `(rule_id, line)` → [`EvidenceBlock`].
+    pub fn extract_file(
+        &self,
+        file_path: &str,
+        source: &str,
+        findings: &[&RawFinding],
+    ) -> HashMap<(String, u32), EvidenceBlock> {
+        // Detect language from extension.
+        let ext = Path::new(file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        // Parse source once (may be None for unsupported/broken files).
+        let tree = self.parse_source(&ext, source);
+        let node_kinds = language_node_kinds(&ext);
+        let source_bytes = source.as_bytes();
+
+        let mut result = HashMap::new();
+
+        for f in findings {
+            let (matched_code, context_before, context_after) =
+                self.extract_line_context(f, source);
+
+            let (enclosing_function, enclosing_class, imports) = if let (Some(tree), Some(nk)) =
+                (tree.as_ref(), node_kinds.as_ref())
+            {
+                let root = tree.root_node();
+                let ts_line = line_to_index(f.line);
+
+                let func = find_enclosing_by_kinds(root, ts_line, nk.function_kinds, source_bytes);
+                let class = find_enclosing_by_kinds(root, ts_line, nk.class_kinds, source_bytes);
+                let imps = extract_imports_from_tree(root, source_bytes, nk.import_kinds);
+                (func, class, imps)
+            } else {
+                (None, None, vec![])
+            };
+
+            let block = EvidenceBlock {
+                matched_code,
+                context_before,
+                context_after,
+                enclosing_function,
+                enclosing_class,
+                imports,
+            };
+
+            result.insert((f.rule_id.clone(), f.line), block);
+        }
+
+        result
+    }
+}
+
+impl Default for EvidenceExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Legacy line-window extraction (used by IssueBuilder until fully wired) ───
+
 /// Extract an [`EvidenceBlock`] for a finding using line-window strategy.
 ///
 /// Tree-sitter extraction (enclosing_function, enclosing_class, imports) is
-/// implemented in Plan 03-02. This function provides the line-window portion.
+/// fully implemented via [`EvidenceExtractor`]. This function provides the
+/// line-window portion only (used by `IssueBuilder` for backwards compat).
 ///
 /// # Arguments
 /// * `scanner_code` – value of `RawFinding::matched_code`; used as `matched_code`.
@@ -90,32 +454,14 @@ pub fn extract_evidence_block(
     if line > 0 && file_path != "<project>" {
         let full_path = project_root.join(file_path);
         if let Ok(source) = std::fs::read_to_string(&full_path) {
-            let lines: Vec<&str> = source.lines().collect();
-            // Convert from 1-based SARIF line to 0-based Vec index.
-            let center = (line as usize).saturating_sub(1);
-            let start = center.saturating_sub(CONTEXT_LINES);
-            let end = (center + CONTEXT_LINES + 1).min(lines.len());
-
-            let context_before: Vec<String> = if start < center {
-                lines[start..center].iter().map(|s| s.to_string()).collect()
-            } else {
-                vec![]
-            };
+            let (source_line, context_before, context_after) =
+                extract_context(&source, line, CONTEXT_LINES);
 
             // Matched code from source if scanner didn't provide it.
-            let code = if matched_code.trim().is_empty() && center < lines.len() {
-                lines[center].to_string()
+            let code = if matched_code.trim().is_empty() {
+                source_line
             } else {
                 matched_code.clone()
-            };
-
-            let context_after: Vec<String> = if center + 1 < end {
-                lines[center + 1..end]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect()
-            } else {
-                vec![]
             };
 
             return EvidenceBlock::from_line_window(code, context_before, context_after);
@@ -197,5 +543,33 @@ mod tests {
         assert_eq!(block.matched_code, "eval(x)");
         assert!(block.enclosing_function.is_none());
         assert!(block.enclosing_class.is_none());
+    }
+
+    #[test]
+    fn line_to_index_converts_correctly() {
+        assert_eq!(line_to_index(1), 0);
+        assert_eq!(line_to_index(10), 9);
+        assert_eq!(line_to_index(0), 0); // saturating_sub(1) from 0
+    }
+
+    #[test]
+    fn extract_context_edge_line1() {
+        let source = "aaa\nbbb\nccc\n";
+        let (matched, before, after) = extract_context(source, 1, 5);
+        assert_eq!(matched, "aaa");
+        assert_eq!(before.len(), 0, "no lines before line 1");
+        assert_eq!(after.len(), 2); // bbb, ccc
+    }
+
+    #[test]
+    fn extract_context_middle() {
+        let source = (1..=20)
+            .map(|i| format!("line{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let (matched, before, after) = extract_context(&source, 10, 5);
+        assert_eq!(matched, "line10");
+        assert_eq!(before.len(), 5);
+        assert_eq!(after.len(), 5);
     }
 }

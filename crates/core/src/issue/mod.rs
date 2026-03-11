@@ -21,7 +21,9 @@ pub mod priority;
 pub mod verification;
 
 pub use builder::{fingerprint, IssueBuilder};
-pub use evidence::{extract_evidence_block, EvidenceBlock, CONTEXT_LINES};
+pub use evidence::{
+    extract_evidence_block, EvidenceBlock, EvidenceExtractor, LanguageNodeKinds, CONTEXT_LINES,
+};
 pub use fix_meta::{FixComplexity, FixMetadata};
 pub use priority::{priority_level, wsjf_score, PriorityLevel};
 pub use verification::VerificationInfo;
