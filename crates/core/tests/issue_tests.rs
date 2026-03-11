@@ -155,38 +155,185 @@ mod issue_tests {
 
     // ── EVID-09: Three output files written ───────────────────────────────────
 
+    fn make_test_issue(
+        id: &str,
+        auto_fixable: bool,
+        file_path: &str,
+    ) -> rice_guard_core::issue::Issue {
+        use rice_guard_core::issue::{EvidenceBlock, FixComplexity, FixMetadata, VerificationInfo};
+        rice_guard_core::issue::Issue {
+            id: id.to_string(),
+            rule_id: "test-rule".to_string(),
+            severity: "warning".to_string(),
+            file_path: file_path.to_string(),
+            line: 1,
+            message: format!("Test message for {id}"),
+            scanner: "semgrep".to_string(),
+            evidence: EvidenceBlock {
+                matched_code: "let x = 1;".to_string(),
+                context_before: vec!["// before".to_string()],
+                context_after: vec!["// after".to_string()],
+                enclosing_function: Some("main".to_string()),
+                enclosing_class: None,
+                imports: vec![],
+            },
+            fix: FixMetadata {
+                auto_fixable,
+                auto_fix_tool: if auto_fixable {
+                    Some("cargo clippy --fix".to_string())
+                } else {
+                    None
+                },
+                auto_fix_category: if auto_fixable {
+                    Some("linter".to_string())
+                } else {
+                    None
+                },
+                suggested_replacement: None,
+                complexity: FixComplexity::Trivial,
+            },
+            verification: VerificationInfo {
+                rerun_command: "rice-guard scan .".to_string(),
+                success_condition: "no findings".to_string(),
+            },
+            priority_score: if auto_fixable { 60 } else { 20 },
+            cross_file: false,
+        }
+    }
+
+    fn make_output_writer(dir: &std::path::Path) -> rice_guard_core::output::OutputWriter {
+        rice_guard_core::output::OutputWriter::new(dir)
+    }
+
+    fn make_summary(
+        issues: &[rice_guard_core::issue::Issue],
+    ) -> rice_guard_core::output::ScanSummary {
+        rice_guard_core::output::ScanSummary::from_issues(
+            issues,
+            vec!["semgrep".to_string()],
+            "/test/project",
+            500,
+        )
+    }
+
     /// EVID-09 — OutputWriter produces issues.json, issues-fixable.json,
-    /// and issues-remaining.json in the output directory.
+    /// issues-remaining.json, summary.json, summary.txt in the output directory.
     #[test]
-    #[ignore = "Wave 0 stub: implement OutputWriter.write_all in Plan 03-04"]
     fn output_three_files_written() {
-        todo!("verify three JSON files exist after write_all");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let issues = vec![
+            make_test_issue("issue-1", true, "src/main.rs"),
+            make_test_issue("issue-2", true, "src/lib.rs"),
+            make_test_issue("issue-3", false, "src/utils.rs"),
+        ];
+        let summary = make_summary(&issues);
+        let writer = make_output_writer(dir.path());
+        writer.write_all(&issues, &summary).expect("write_all");
+
+        let base = dir.path();
+        assert!(base.join("issues.json").exists(), "issues.json must exist");
+        assert!(
+            base.join("issues-fixable.json").exists(),
+            "issues-fixable.json must exist"
+        );
+        assert!(
+            base.join("issues-remaining.json").exists(),
+            "issues-remaining.json must exist"
+        );
+        assert!(
+            base.join("summary.json").exists(),
+            "summary.json must exist"
+        );
+        assert!(base.join("summary.txt").exists(), "summary.txt must exist");
     }
 
     /// EVID-09 — issues-fixable.json contains only auto_fixable=true issues;
     /// issues-remaining.json contains only auto_fixable=false issues.
     #[test]
-    #[ignore = "Wave 0 stub: implement fixable/remaining split in Plan 03-04"]
     fn fixable_remaining_split_correct() {
-        todo!("verify fixable and remaining JSON files contain correct subsets");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let issues = vec![
+            make_test_issue("fix-1", true, "src/a.rs"),
+            make_test_issue("fix-2", true, "src/b.rs"),
+            make_test_issue("rem-1", false, "src/c.rs"),
+        ];
+        let summary = make_summary(&issues);
+        let writer = make_output_writer(dir.path());
+        writer.write_all(&issues, &summary).expect("write_all");
+
+        let fixable_bytes =
+            std::fs::read(dir.path().join("issues-fixable.json")).expect("read fixable");
+        let fixable: Vec<rice_guard_core::issue::Issue> =
+            serde_json::from_slice(&fixable_bytes).expect("parse fixable");
+        assert_eq!(fixable.len(), 2, "fixable.json must contain 2 issues");
+        assert!(
+            fixable.iter().all(|i| i.fix.auto_fixable),
+            "all issues in fixable must have auto_fixable=true"
+        );
+
+        let remaining_bytes =
+            std::fs::read(dir.path().join("issues-remaining.json")).expect("read remaining");
+        let remaining: Vec<rice_guard_core::issue::Issue> =
+            serde_json::from_slice(&remaining_bytes).expect("parse remaining");
+        assert_eq!(remaining.len(), 1, "remaining.json must contain 1 issue");
+        assert!(
+            remaining.iter().all(|i| !i.fix.auto_fixable),
+            "all issues in remaining must have auto_fixable=false"
+        );
     }
 
     // ── EVID-10: summary.json counts match ───────────────────────────────────
 
     /// EVID-10 — summary.json total_issues matches the actual issue count.
     #[test]
-    #[ignore = "Wave 0 stub: implement ScanSummary serialization in Plan 03-04"]
     fn summary_json_counts_match() {
-        todo!("verify summary.json total_issues == len(issues)");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let issues = vec![
+            make_test_issue("issue-1", true, "src/a.rs"),
+            make_test_issue("issue-2", true, "src/b.rs"),
+            make_test_issue("issue-3", false, "src/c.rs"),
+        ];
+        let summary = make_summary(&issues);
+        let writer = make_output_writer(dir.path());
+        writer.write_all(&issues, &summary).expect("write_all");
+
+        let summary_bytes = std::fs::read(dir.path().join("summary.json")).expect("read summary");
+        let parsed: rice_guard_core::output::ScanSummary =
+            serde_json::from_slice(&summary_bytes).expect("parse summary");
+        assert_eq!(parsed.total_issues, 3, "total_issues must be 3");
+        assert_eq!(parsed.fixable_count, 2, "fixable_count must be 2");
+        assert_eq!(parsed.remaining_count, 1, "remaining_count must be 1");
     }
 
     // ── EVID-11: summary.txt is ASCII table ───────────────────────────────────
 
     /// EVID-11 — summary.txt uses only ASCII characters (no Unicode box-drawing).
     #[test]
-    #[ignore = "Wave 0 stub: implement summary.txt writer in Plan 03-04"]
     fn summary_txt_ascii_table() {
-        todo!("verify summary.txt contains only ASCII characters");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let issues = vec![
+            make_test_issue("issue-1", true, "src/main.rs"),
+            make_test_issue("issue-2", false, "src/lib.rs"),
+        ];
+        let summary = make_summary(&issues);
+        let writer = make_output_writer(dir.path());
+        writer.write_all(&issues, &summary).expect("write_all");
+
+        let txt = std::fs::read(dir.path().join("summary.txt")).expect("read summary.txt");
+        assert!(txt.is_ascii(), "summary.txt must contain only ASCII bytes");
+        let content = String::from_utf8(txt).expect("valid utf8");
+        assert!(
+            content.contains('+'),
+            "summary.txt must contain '+' borders"
+        );
+        assert!(
+            content.contains('|'),
+            "summary.txt must contain '|' separators"
+        );
+        assert!(
+            content.contains('-'),
+            "summary.txt must contain '-' borders"
+        );
     }
 
     // ── EVID-12: forward-slash paths ─────────────────────────────────────────
@@ -194,9 +341,28 @@ mod issue_tests {
     /// EVID-12 — all file_path values in output use forward slashes,
     /// even on Windows where the OS separator is backslash.
     #[test]
-    #[ignore = "Wave 0 stub: verify path normalization propagation in Plan 03-04"]
     fn path_forward_slashes_in_output() {
-        todo!("verify no backslashes in any file_path in issues.json");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let issues = vec![make_test_issue(
+            "issue-1",
+            true,
+            r"src\foo\bar.py", // Windows-style backslash path
+        )];
+        let summary = make_summary(&issues);
+        let writer = make_output_writer(dir.path());
+        writer.write_all(&issues, &summary).expect("write_all");
+
+        let bytes = std::fs::read(dir.path().join("issues.json")).expect("read issues.json");
+        let content = String::from_utf8(bytes).expect("valid utf8");
+        assert!(
+            !content.contains('\\'),
+            "issues.json must not contain backslashes in file_path: {}",
+            content
+        );
+        assert!(
+            content.contains("src/foo/bar.py"),
+            "issues.json must contain forward-slash path"
+        );
     }
 
     // ── Compile-time: ScanSummary struct has required fields ─────────────────

@@ -16,25 +16,47 @@ pub mod summary;
 
 pub use summary::ScanSummary;
 
+use std::path::{Path, PathBuf};
+
 use crate::issue::Issue;
 
 /// Writes all output files from a completed scan.
 ///
-/// This is a stub — full implementation in Plan 03-04.
-#[allow(dead_code)]
-pub struct OutputWriter;
+/// # Example
+///
+/// ```rust,no_run
+/// use rice_guard_core::output::{OutputWriter, ScanSummary};
+///
+/// let writer = OutputWriter::new(std::path::Path::new("/tmp/scan-out"));
+/// // writer.write_all(&issues, &summary).unwrap();
+/// ```
+pub struct OutputWriter {
+    dir: PathBuf,
+}
 
 impl OutputWriter {
+    /// Create an `OutputWriter` that writes to `dir`.
+    ///
+    /// The directory must already exist (created by `OutputDir::new`).
+    pub fn new(dir: &Path) -> Self {
+        Self {
+            dir: dir.to_path_buf(),
+        }
+    }
+
     /// Write all output files for a completed scan.
     ///
     /// Produces:
-    /// - `issues.json` (all issues, WSJF-sorted)
+    /// - `issues.json` (all issues, WSJF-sorted, forward-slash paths)
     /// - `issues-fixable.json` (auto_fixable = true)
     /// - `issues-remaining.json` (auto_fixable = false)
     /// - `summary.json`
     /// - `summary.txt`
-    pub fn write_all(&self, _issues: &[Issue], _summary: &ScanSummary) -> anyhow::Result<()> {
-        todo!("implement in Plan 03-04")
+    pub fn write_all(&self, issues: &[Issue], summary: &ScanSummary) -> anyhow::Result<()> {
+        // Sort a clone by priority before writing.
+        let mut sorted = issues.to_vec();
+        sort_issues(&mut sorted);
+        files::write_all_files(&self.dir, &sorted, summary)
     }
 
     /// Build a [`ScanSummary`] from a slice of [`Issue`]s.
@@ -82,6 +104,13 @@ impl OutputWriter {
     pub fn sort_by_priority(issues: &mut [Issue]) {
         issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
     }
+}
+
+/// Sort issues by WSJF priority score, highest first.
+///
+/// Module-level function for use in the scan CLI pipeline.
+pub fn sort_issues(issues: &mut [Issue]) {
+    issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
 }
 
 #[cfg(test)]
@@ -164,5 +193,17 @@ mod tests {
         assert_eq!(summary.total_issues, 0);
         assert_eq!(summary.fixable_count, 0);
         assert_eq!(summary.remaining_count, 0);
+    }
+
+    #[test]
+    fn sort_issues_fn_highest_first() {
+        let mut issues = vec![
+            make_issue("info", false, 5),
+            make_issue("error", true, 90),
+            make_issue("warning", false, 20),
+        ];
+        sort_issues(&mut issues);
+        assert_eq!(issues[0].priority_score, 90);
+        assert_eq!(issues[2].priority_score, 5);
     }
 }
