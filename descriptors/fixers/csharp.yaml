@@ -1,0 +1,31 @@
+name: csharp
+language: csharp
+detect:
+  - "*.csproj"
+  - "*.sln"
+  - global.json
+stages:
+  format:
+    - name: dotnet-format
+      check: "dotnet format --verify-no-changes"
+      fix: "dotnet format"
+      scope: project
+      safe: true
+  lint:
+    - name: dotnet-analyzers
+      check: "dotnet build /warnaserror"
+      fix: "dotnet format analyzers"
+      scope: project
+      safe: true
+  security:
+    - name: semgrep-csharp-security
+      check: "semgrep --config p/csharp --json -o /dev/null ."
+      fix: "semgrep --config p/csharp --autofix ."
+      scope: project
+      safe: true
+  deps:
+    - name: dotnet-outdated
+      check: "dotnet outdated"
+      fix: "dotnet outdated --upgrade"
+      scope: project
+      safe: true

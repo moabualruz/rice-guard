@@ -1,0 +1,35 @@
+name: dart
+language: dart
+detect:
+  - pubspec.yaml
+  - pubspec.lock
+stages:
+  format:
+    - name: dart-format
+      check: "dart format --set-exit-if-changed lib/ test/"
+      fix: "dart format lib/ test/"
+      scope: project
+      safe: true
+  lint:
+    - name: dart-fix
+      check: "dart analyze --fatal-infos"
+      fix: "dart fix --apply"
+      scope: project
+      safe: true
+    - name: flutter-analyze
+      check: "flutter analyze"
+      fix: "flutter analyze --no-fatal-infos"
+      scope: project
+      safe: true
+  deps:
+    - name: dart-pub-upgrade
+      check: "dart pub outdated"
+      fix: "dart pub upgrade"
+      scope: project
+      safe: true
+  import:
+    - name: dart-fix-imports
+      check: "dart fix --dry-run"
+      fix: "dart fix --apply"
+      scope: project
+      safe: true

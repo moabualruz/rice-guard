@@ -1,0 +1,52 @@
+name: typescript
+language: typescript
+detect:
+  - tsconfig.json
+  - package.json
+stages:
+  format:
+    - name: biome-format
+      check: "biome format --write=false ."
+      fix: "biome format --write ."
+      scope: project
+      safe: true
+    - name: prettier
+      check: "prettier --check ."
+      fix: "prettier --write ."
+      scope: project
+      safe: true
+  lint:
+    - name: biome-lint-safe
+      check: "biome lint ."
+      fix: "biome lint --write ."
+      scope: project
+      safe: true
+    - name: eslint-safe
+      check: "eslint ."
+      fix: "eslint --fix ."
+      scope: project
+      safe: true
+    - name: eslint-unsafe
+      check: "eslint --rule '{\"no-var\": \"error\"}' ."
+      fix: "eslint --fix --fix-type suggestion ."
+      scope: project
+      safe: false
+      unsafe_flag: "--fix-type suggestion"
+  deps:
+    - name: npm-audit-fix
+      check: "npm audit"
+      fix: "npm audit fix"
+      scope: project
+      safe: true
+    - name: npm-audit-fix-force
+      check: "npm audit"
+      fix: "npm audit fix --force"
+      scope: project
+      safe: false
+      unsafe_flag: "--force"
+  import:
+    - name: biome-imports
+      check: "biome check --formatter-enabled=false --linter-enabled=false ."
+      fix: "biome check --write ."
+      scope: project
+      safe: true

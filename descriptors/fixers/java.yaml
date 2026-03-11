@@ -1,0 +1,32 @@
+name: java
+language: java
+detect:
+  - pom.xml
+  - build.gradle
+  - build.gradle.kts
+  - gradlew
+stages:
+  format:
+    - name: google-java-format
+      check: "google-java-format --dry-run --set-exit-if-changed {{files}}"
+      fix: "google-java-format --replace {{files}}"
+      scope: file
+      safe: true
+  lint:
+    - name: checkstyle
+      check: "checkstyle -c /google_checks.xml {{files}}"
+      fix: "checkstyle -c /google_checks.xml {{files}}"
+      scope: file
+      safe: true
+  security:
+    - name: semgrep-java-security
+      check: "semgrep --config p/java --json -o /dev/null ."
+      fix: "semgrep --config p/java --autofix ."
+      scope: project
+      safe: true
+  deps:
+    - name: gradle-dependencies
+      check: "gradle dependencyUpdates --output-dir {{output_dir}}"
+      fix: "gradle dependencies"
+      scope: project
+      safe: true

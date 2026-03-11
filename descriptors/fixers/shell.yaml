@@ -1,0 +1,26 @@
+name: shell
+language: shell
+detect:
+  - "*.sh"
+  - "*.bash"
+  - "*.zsh"
+  - "*.fish"
+stages:
+  format:
+    - name: shfmt
+      check: "shfmt -d ."
+      fix: "shfmt -w ."
+      scope: project
+      safe: true
+  lint:
+    - name: shellcheck-safe
+      check: "shellcheck {{files}}"
+      fix: "shellcheck --format=diff {{files}}"
+      scope: file
+      safe: true
+    - name: shellcheck-unsafe
+      check: "shellcheck -S error {{files}}"
+      fix: "shellcheck -S error --format=diff {{files}}"
+      scope: file
+      safe: false
+      unsafe_flag: "-S error"

@@ -1,0 +1,46 @@
+name: go
+language: go
+detect:
+  - go.mod
+  - go.sum
+stages:
+  format:
+    - name: gofumpt
+      check: "gofumpt -l ."
+      fix: "gofumpt -w ."
+      scope: project
+      safe: true
+    - name: goimports
+      check: "goimports -l ."
+      fix: "goimports -w ."
+      scope: project
+      safe: true
+  lint:
+    - name: golangci-lint-safe
+      check: "golangci-lint run --fix=false ./..."
+      fix: "golangci-lint run --fix ./..."
+      scope: project
+      safe: true
+    - name: golangci-lint-unsafe
+      check: "golangci-lint run --fix=false --enable=godot,wsl ./..."
+      fix: "golangci-lint run --fix --enable=godot,wsl ./..."
+      scope: project
+      safe: false
+      unsafe_flag: "--enable=godot,wsl"
+  deps:
+    - name: go-mod-tidy
+      check: "go mod tidy -v"
+      fix: "go mod tidy"
+      scope: project
+      safe: true
+    - name: go-mod-verify
+      check: "go mod verify"
+      fix: "go mod download"
+      scope: project
+      safe: true
+  import:
+    - name: goimports-all
+      check: "goimports -l ./..."
+      fix: "goimports -w ./..."
+      scope: project
+      safe: true

@@ -1,0 +1,45 @@
+name: python
+language: python
+detect:
+  - pyproject.toml
+  - setup.py
+  - setup.cfg
+  - requirements.txt
+  - Pipfile
+stages:
+  format:
+    - name: ruff-format
+      check: "ruff format --check ."
+      fix: "ruff format ."
+      scope: project
+      safe: true
+  lint:
+    - name: ruff-check-safe
+      check: "ruff check ."
+      fix: "ruff check --fix ."
+      scope: project
+      safe: true
+    - name: ruff-check-unsafe
+      check: "ruff check --select ALL ."
+      fix: "ruff check --fix --unsafe-fixes ."
+      scope: project
+      safe: false
+      unsafe_flag: "--unsafe-fixes"
+  security:
+    - name: semgrep-python-security
+      check: "semgrep --config p/python --json -o /dev/null ."
+      fix: "semgrep --config p/python --autofix ."
+      scope: project
+      safe: true
+  deps:
+    - name: pip-audit-fix
+      check: "pip-audit --strict"
+      fix: "pip-audit --fix"
+      scope: project
+      safe: true
+  import:
+    - name: ruff-imports
+      check: "ruff check --select F401,I ."
+      fix: "ruff check --fix --select F401,I ."
+      scope: project
+      safe: true

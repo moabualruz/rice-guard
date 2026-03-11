@@ -1,0 +1,36 @@
+name: rust
+language: rust
+detect:
+  - Cargo.toml
+  - Cargo.lock
+stages:
+  format:
+    - name: rustfmt
+      check: "cargo fmt --all --check"
+      fix: "cargo fmt --all"
+      scope: project
+      safe: true
+  lint:
+    - name: clippy-safe
+      check: "cargo clippy -- -D warnings"
+      fix: "cargo clippy --fix --allow-staged -- -D warnings"
+      scope: project
+      safe: true
+    - name: clippy-unsafe
+      check: "cargo clippy -- -D warnings -W clippy::all"
+      fix: "cargo clippy --fix --allow-staged --allow-dirty -- -D warnings"
+      scope: project
+      safe: false
+      unsafe_flag: "--allow-dirty"
+  deps:
+    - name: cargo-update
+      check: "cargo outdated --exit-code 1"
+      fix: "cargo update"
+      scope: project
+      safe: true
+  import:
+    - name: cargo-fix-unused
+      check: "cargo fix --allow-no-vcs --edition"
+      fix: "cargo fix --allow-no-vcs"
+      scope: project
+      safe: true

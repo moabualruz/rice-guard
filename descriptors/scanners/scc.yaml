@@ -1,0 +1,36 @@
+name: scc
+version: ">=3.0"
+languages:
+  - go
+  - python
+  - javascript
+  - typescript
+  - java
+  - kotlin
+  - php
+  - ruby
+  - rust
+  - dart
+  - csharp
+  - shell
+  - yaml
+  - json
+  - markdown
+  - html
+  - css
+  - dockerfile
+  - terraform
+install:
+  check: "scc --version"
+  brew: "brew install scc"
+  go: "go install github.com/boyter/scc/v3@latest"
+  script: "curl -sfL https://raw.githubusercontent.com/boyter/scc/master/scripts/install.sh | sh"
+commands:
+  scan:
+    cmd: "scc --format json --by-file --out {{output_dir}}/scc.json ."
+    timeout: 60
+  quick:
+    cmd: "scc --format json --out {{output_dir}}/scc.json ."
+    timeout: 30
+output_format: json
+severity_map: {}

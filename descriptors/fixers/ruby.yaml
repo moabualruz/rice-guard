@@ -1,0 +1,42 @@
+name: ruby
+language: ruby
+detect:
+  - Gemfile
+  - Gemfile.lock
+  - "*.gemspec"
+stages:
+  format:
+    - name: rubocop-format
+      check: "rubocop --only Layout"
+      fix: "rubocop --only Layout --auto-correct"
+      scope: project
+      safe: true
+  lint:
+    - name: rubocop-safe
+      check: "rubocop"
+      fix: "rubocop --auto-correct"
+      scope: project
+      safe: true
+    - name: rubocop-unsafe
+      check: "rubocop --only Style"
+      fix: "rubocop --only Style --auto-correct-all"
+      scope: project
+      safe: false
+      unsafe_flag: "--auto-correct-all"
+  security:
+    - name: semgrep-ruby-security
+      check: "semgrep --config p/ruby --json -o /dev/null ."
+      fix: "semgrep --config p/ruby --autofix ."
+      scope: project
+      safe: true
+    - name: brakeman
+      check: "brakeman -q --no-summary"
+      fix: "brakeman -q"
+      scope: project
+      safe: true
+  deps:
+    - name: bundle-audit
+      check: "bundle-audit check"
+      fix: "bundle-audit update"
+      scope: project
+      safe: true

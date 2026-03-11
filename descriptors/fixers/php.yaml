@@ -1,0 +1,30 @@
+name: php
+language: php
+detect:
+  - composer.json
+  - composer.lock
+stages:
+  format:
+    - name: php-cs-fixer
+      check: "php-cs-fixer fix --dry-run --diff ."
+      fix: "php-cs-fixer fix ."
+      scope: project
+      safe: true
+  lint:
+    - name: phpstan
+      check: "phpstan analyse"
+      fix: "phpstan analyse --error-format=json"
+      scope: project
+      safe: true
+  security:
+    - name: semgrep-php-security
+      check: "semgrep --config p/php --json -o /dev/null ."
+      fix: "semgrep --config p/php --autofix ."
+      scope: project
+      safe: true
+  deps:
+    - name: composer-audit
+      check: "composer audit --no-plugins"
+      fix: "composer update --no-plugins"
+      scope: project
+      safe: true

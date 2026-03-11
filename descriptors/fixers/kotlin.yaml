@@ -1,0 +1,38 @@
+name: kotlin
+language: kotlin
+detect:
+  - build.gradle.kts
+  - build.gradle
+  - settings.gradle.kts
+  - gradlew
+stages:
+  format:
+    - name: ktfmt
+      check: "ktfmt --dry-run {{files}}"
+      fix: "ktfmt {{files}}"
+      scope: file
+      safe: true
+  lint:
+    - name: detekt-safe
+      check: "detekt --config detekt.yml"
+      fix: "detekt --config detekt.yml --auto-correct"
+      scope: project
+      safe: true
+    - name: detekt-unsafe
+      check: "detekt --config detekt.yml --all-rules"
+      fix: "detekt --config detekt.yml --all-rules --auto-correct"
+      scope: project
+      safe: false
+      unsafe_flag: "--all-rules"
+  security:
+    - name: semgrep-kotlin-security
+      check: "semgrep --config p/kotlin --json -o /dev/null ."
+      fix: "semgrep --config p/kotlin --autofix ."
+      scope: project
+      safe: true
+  deps:
+    - name: gradle-kotlin-deps
+      check: "gradle dependencyUpdates"
+      fix: "gradle dependencies"
+      scope: project
+      safe: true

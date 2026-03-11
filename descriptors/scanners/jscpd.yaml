@@ -1,0 +1,30 @@
+name: jscpd
+version: ">=4.0"
+languages:
+  - go
+  - python
+  - javascript
+  - typescript
+  - java
+  - kotlin
+  - php
+  - ruby
+  - rust
+  - dart
+  - csharp
+  - shell
+install:
+  check: "jscpd --version"
+  npm: "npm install -g jscpd"
+commands:
+  scan:
+    cmd: "jscpd . --reporters json --output {{output_dir}}"
+    timeout: 120
+  quick:
+    cmd: "jscpd . --reporters json --output {{output_dir}} --threshold 10"
+    timeout: 60
+output_format: json
+severity_map:
+  high: high
+  medium: medium
+  low: low

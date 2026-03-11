@@ -1,0 +1,39 @@
+name: trivy
+version: ">=0.50"
+languages:
+  - go
+  - python
+  - javascript
+  - typescript
+  - java
+  - kotlin
+  - php
+  - ruby
+  - rust
+  - dart
+  - csharp
+  - dockerfile
+  - terraform
+  - yaml
+install:
+  check: "trivy --version"
+  brew: "brew install trivy"
+  script: "curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin"
+  docker: "docker pull aquasec/trivy"
+commands:
+  scan:
+    cmd: "trivy fs --format sarif --output {{output_dir}}/trivy.sarif ."
+    timeout: 300
+  security:
+    cmd: "trivy fs --scanners vuln,secret,config --format sarif --output {{output_dir}}/trivy.sarif ."
+    timeout: 300
+  quick:
+    cmd: "trivy fs --scanners vuln --format sarif --output {{output_dir}}/trivy.sarif ."
+    timeout: 120
+output_format: sarif
+severity_map:
+  CRITICAL: critical
+  HIGH: high
+  MEDIUM: medium
+  LOW: low
+  UNKNOWN: info

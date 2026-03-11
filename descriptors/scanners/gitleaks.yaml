@@ -1,0 +1,35 @@
+name: gitleaks
+version: ">=8.18"
+languages:
+  - go
+  - python
+  - javascript
+  - typescript
+  - java
+  - kotlin
+  - php
+  - ruby
+  - rust
+  - dart
+  - csharp
+  - shell
+install:
+  check: "gitleaks version"
+  brew: "brew install gitleaks"
+  script: "curl -sfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b /usr/local/bin"
+  docker: "docker pull zricethezav/gitleaks"
+commands:
+  scan:
+    cmd: "gitleaks detect --source . --report-format sarif --report-path {{output_dir}}/gitleaks.sarif --no-git"
+    timeout: 180
+  security:
+    cmd: "gitleaks detect --source . --report-format sarif --report-path {{output_dir}}/gitleaks.sarif"
+    timeout: 300
+  quick:
+    cmd: "gitleaks detect --source . --report-format json --report-path {{output_dir}}/gitleaks.json --no-git --log-opts HEAD~1..HEAD"
+    timeout: 60
+output_format: sarif
+severity_map:
+  HIGH: high
+  MEDIUM: medium
+  LOW: low
