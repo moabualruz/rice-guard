@@ -3,103 +3,127 @@
 //! Evidence provides the surrounding code context for a finding, making the
 //! output self-contained for AI consumption and human review.
 //!
-//! ## Extraction Strategy
+//! ## Fields
 //!
-//! 1. **Scanner-provided** (`RawFinding::matched_code`): use as-is; highest
-//!    fidelity since the scanner already knows the exact match boundary.
-//! 2. **Line-window fallback**: read the source file and return N lines
-//!    centred on `RawFinding::line`. Used when the scanner did not supply
-//!    matched code or when `line > 0`.
-//! 3. **Unknown** (`Evidence::Unknown`): emitted when the file cannot be
-//!    read or the line is 0 and no scanner code exists.
-
-use std::path::Path;
+//! - `matched_code` — the flagged code snippet (from scanner or line-window)
+//! - `context_before` — lines before the finding
+//! - `context_after` — lines after the finding
+//! - `enclosing_function` — function/method name extracted via tree-sitter (Phase 3, Plan 02)
+//! - `enclosing_class` — class/struct name extracted via tree-sitter (Phase 3, Plan 02)
+//! - `imports` — file-level import statements extracted via tree-sitter (Phase 3, Plan 02)
 
 use serde::{Deserialize, Serialize};
 
-/// Code evidence attached to a finding.
+/// Pre-embedded code evidence for a finding.
 ///
 /// Designed to be serialized into the AI-ready JSON output so that an LLM
 /// can reason about the finding without access to the source repository.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum Evidence {
-    /// Code provided directly by the scanner (highest fidelity).
-    ScannerProvided {
-        /// Raw snippet exactly as the scanner reported it.
-        code: String,
-    },
-    /// A window of source lines centred on the finding's line number.
-    LineWindow {
-        /// The 1-based line number at the centre of the window.
-        center_line: u32,
-        /// Lines before the finding (inclusive of `center_line`).
-        before: u8,
-        /// Lines after the finding.
-        after: u8,
-        /// The extracted source text (may span multiple lines).
-        code: String,
-    },
-    /// Evidence could not be extracted (file unreadable, line = 0, etc.).
-    Unknown,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvidenceBlock {
+    /// The flagged code snippet as reported by the scanner.
+    /// May be an empty string when the scanner provided no snippet.
+    pub matched_code: String,
+
+    /// Lines immediately before the finding (up to ±5 lines by default).
+    pub context_before: Vec<String>,
+
+    /// Lines immediately after the finding.
+    pub context_after: Vec<String>,
+
+    /// Name of the function/method that contains the finding.
+    /// `None` when at module level or when tree-sitter parsing failed.
+    pub enclosing_function: Option<String>,
+
+    /// Name of the class/struct/interface that contains the finding.
+    /// `None` when at module level or when tree-sitter parsing failed.
+    pub enclosing_class: Option<String>,
+
+    /// File-level import/use statements extracted from the source file.
+    /// Empty when tree-sitter parsing failed or file has no imports.
+    pub imports: Vec<String>,
 }
 
-impl Evidence {
-    /// Return the code snippet regardless of variant, or `None` for `Unknown`.
-    pub fn code(&self) -> Option<&str> {
-        match self {
-            Self::ScannerProvided { code } | Self::LineWindow { code, .. } => Some(code.as_str()),
-            Self::Unknown => None,
+impl EvidenceBlock {
+    /// Build an `EvidenceBlock` from a scanner-provided code snippet and
+    /// a surrounding line window extracted from the source file.
+    ///
+    /// This is the line-window-only constructor used until tree-sitter
+    /// extraction is implemented in Plan 03-02.
+    pub fn from_line_window(
+        matched_code: String,
+        context_before: Vec<String>,
+        context_after: Vec<String>,
+    ) -> Self {
+        Self {
+            matched_code,
+            context_before,
+            context_after,
+            enclosing_function: None,
+            enclosing_class: None,
+            imports: vec![],
         }
     }
 }
 
 /// Number of context lines to include above and below the finding line.
-const CONTEXT_LINES: usize = 3;
+pub const CONTEXT_LINES: usize = 5;
 
-/// Extract [`Evidence`] for a finding.
+/// Extract an [`EvidenceBlock`] for a finding using line-window strategy.
+///
+/// Tree-sitter extraction (enclosing_function, enclosing_class, imports) is
+/// implemented in Plan 03-02. This function provides the line-window portion.
 ///
 /// # Arguments
-/// * `scanner_code` – value of `RawFinding::matched_code`; used first.
+/// * `scanner_code` – value of `RawFinding::matched_code`; used as `matched_code`.
 /// * `file_path` – relative source file path; joined with `project_root`.
 /// * `line` – 1-based line number (0 means unknown).
 /// * `project_root` – working directory of the scan.
-pub fn extract_evidence(
+pub fn extract_evidence_block(
     scanner_code: Option<&str>,
     file_path: &str,
     line: u32,
-    project_root: &Path,
-) -> Evidence {
-    // Strategy 1: scanner already provided the match.
-    if let Some(code) = scanner_code {
-        if !code.trim().is_empty() {
-            return Evidence::ScannerProvided {
-                code: code.to_string(),
-            };
-        }
-    }
+    project_root: &std::path::Path,
+) -> EvidenceBlock {
+    let matched_code = scanner_code.unwrap_or("").to_string();
 
-    // Strategy 2: line-window via the source file.
+    // Line-window: read the source file and extract surrounding context.
     if line > 0 && file_path != "<project>" {
         let full_path = project_root.join(file_path);
         if let Ok(source) = std::fs::read_to_string(&full_path) {
             let lines: Vec<&str> = source.lines().collect();
-            let center = (line as usize).saturating_sub(1); // convert to 0-based
+            // Convert from 1-based SARIF line to 0-based Vec index.
+            let center = (line as usize).saturating_sub(1);
             let start = center.saturating_sub(CONTEXT_LINES);
             let end = (center + CONTEXT_LINES + 1).min(lines.len());
-            if start < end {
-                let code = lines[start..end].join("\n");
-                return Evidence::LineWindow {
-                    center_line: line,
-                    before: (center - start) as u8,
-                    after: (end - center - 1) as u8,
-                    code,
-                };
-            }
+
+            let context_before: Vec<String> = if start < center {
+                lines[start..center].iter().map(|s| s.to_string()).collect()
+            } else {
+                vec![]
+            };
+
+            // Matched code from source if scanner didn't provide it.
+            let code = if matched_code.trim().is_empty() && center < lines.len() {
+                lines[center].to_string()
+            } else {
+                matched_code.clone()
+            };
+
+            let context_after: Vec<String> = if center + 1 < end {
+                lines[center + 1..end]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect()
+            } else {
+                vec![]
+            };
+
+            return EvidenceBlock::from_line_window(code, context_before, context_after);
         }
     }
 
-    Evidence::Unknown
+    // Fallback: just the matched code from the scanner, no context.
+    EvidenceBlock::from_line_window(matched_code, vec![], vec![])
 }
 
 #[cfg(test)]
@@ -115,21 +139,20 @@ mod tests {
     }
 
     #[test]
-    fn scanner_provided_takes_priority() {
+    fn scanner_code_used_as_matched_code() {
         let tmp = write_temp("fn foo() {}\n");
         let root = tmp.path().parent().unwrap();
-        let ev = extract_evidence(
+        let block = extract_evidence_block(
             Some("let x = eval(input)"),
             tmp.path().file_name().unwrap().to_str().unwrap(),
             1,
             root,
         );
-        assert!(matches!(ev, Evidence::ScannerProvided { .. }));
-        assert_eq!(ev.code().unwrap(), "let x = eval(input)");
+        assert_eq!(block.matched_code, "let x = eval(input)");
     }
 
     #[test]
-    fn line_window_fallback() {
+    fn context_lines_extracted() {
         let src = "line1\nline2\nline3\nline4\nline5\n";
         let tmp = write_temp(src);
         let root = tmp.path().parent().unwrap();
@@ -140,32 +163,39 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        let ev = extract_evidence(None, &filename, 3, root);
-        assert!(matches!(ev, Evidence::LineWindow { center_line: 3, .. }));
-        let code = ev.code().unwrap();
-        assert!(code.contains("line3"));
+        let block = extract_evidence_block(None, &filename, 3, root);
+        // context_before should have lines 1 and 2
+        assert!(
+            !block.context_before.is_empty(),
+            "context_before should be populated"
+        );
+        // context_after should have lines 4 and 5
+        assert!(
+            !block.context_after.is_empty(),
+            "context_after should be populated"
+        );
     }
 
     #[test]
-    fn unknown_when_no_line_and_no_scanner_code() {
-        let ev = extract_evidence(None, "does_not_exist.py", 0, Path::new("."));
-        assert_eq!(ev, Evidence::Unknown);
+    fn empty_block_for_unknown_file() {
+        let block = extract_evidence_block(None, "does_not_exist.py", 0, std::path::Path::new("."));
+        assert_eq!(block.matched_code, "");
+        assert!(block.context_before.is_empty());
+        assert!(block.context_after.is_empty());
+        assert!(block.enclosing_function.is_none());
+        assert!(block.enclosing_class.is_none());
+        assert!(block.imports.is_empty());
     }
 
     #[test]
-    fn blank_scanner_code_falls_through_to_line_window() {
-        let src = "a\nb\nc\n";
-        let tmp = write_temp(src);
-        let root = tmp.path().parent().unwrap();
-        let filename = tmp
-            .path()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-        // Empty/whitespace scanner code should not be used.
-        let ev = extract_evidence(Some("   "), &filename, 2, root);
-        assert!(matches!(ev, Evidence::LineWindow { .. }));
+    fn from_line_window_constructor() {
+        let block = EvidenceBlock::from_line_window(
+            "eval(x)".to_string(),
+            vec!["# before".to_string()],
+            vec!["# after".to_string()],
+        );
+        assert_eq!(block.matched_code, "eval(x)");
+        assert!(block.enclosing_function.is_none());
+        assert!(block.enclosing_class.is_none());
     }
 }

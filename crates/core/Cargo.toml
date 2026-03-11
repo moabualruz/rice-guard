@@ -5,6 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 
 [features]
+# Gate large/community grammar crates behind an optional feature.
+# Default build compiles the stable 10 grammars only.
+# Enable `full-grammars` to add Dart and Kotlin support.
+full-grammars = ["tree-sitter-dart", "tree-sitter-kotlin"]
 
 [dependencies]
 serde.workspace = true
@@ -25,10 +29,21 @@ inquire.workspace = true
 indicatif.workspace = true
 atty.workspace = true
 
-# Tree-sitter reserved for Phase 4 AST-based evidence extraction.
-# Grammar crates are NOT included here yet — they require compiling large C
-# libraries and are unused until the AST feature is implemented.
-# tree-sitter.workspace = true
+# Tree-sitter for Phase 3 AST-based evidence extraction.
+tree-sitter.workspace = true
+tree-sitter-python.workspace = true
+tree-sitter-rust.workspace = true
+tree-sitter-go.workspace = true
+tree-sitter-javascript.workspace = true
+tree-sitter-typescript.workspace = true
+tree-sitter-java.workspace = true
+tree-sitter-php.workspace = true
+tree-sitter-c-sharp.workspace = true
+tree-sitter-ruby.workspace = true
+tree-sitter-bash.workspace = true
+# Community crates behind optional feature flag (may have C build issues on some platforms)
+tree-sitter-dart = { workspace = true, optional = true }
+tree-sitter-kotlin = { workspace = true, optional = true }
 
 [dev-dependencies]
 insta.workspace = true

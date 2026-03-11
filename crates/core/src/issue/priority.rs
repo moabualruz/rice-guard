@@ -1,30 +1,21 @@
 //! WSJF-based priority scoring for findings.
 //!
-//! Weighted Shortest Job First (WSJF) is used to surface the highest-value,
-//! lowest-effort issues first.  Although we do not have reliable job-size
-//! estimates from static analysis, we approximate with a simplified formula:
+//! ## Formula
 //!
 //! ```text
-//! wsjf_score = (business_value + time_criticality + risk_reduction)
-//!              / job_size_estimate
+//! priority_score = severity(40) + auto_fixable(20) + category(20)
+//!                + file_freq(10) - cross_file(10)
 //! ```
 //!
-//! ## Input Signals
+//! ## Score Components
 //!
-//! | Signal              | Source                         |
-//! |---------------------|--------------------------------|
-//! | `severity`          | Normalized scanner severity    |
-//! | `scanner`           | Which tool found the issue     |
-//! | `has_autofix`       | Whether a fix snippet exists   |
-//!
-//! ## Score Ranges
-//!
-//! | `Priority` level | `wsjf_score` range |
-//! |-------------------|--------------------|
-//! | `Critical`        | ≥ 16               |
-//! | `High`            | 8–15               |
-//! | `Medium`          | 4–7                |
-//! | `Low`             | < 4                |
+//! | Signal           | Value                                                            |
+//! |------------------|------------------------------------------------------------------|
+//! | `severity`       | `error` → 40, `warning` → 20, `info` → 5, other → 0            |
+//! | `auto_fixable`   | true → 20, false → 0                                            |
+//! | `category`       | `formatter`/`import` → 20, `linter`/`security` → 15, else → 10 |
+//! | `file_freq`      | min(findings in file, 10) × 1 (capped at 10)                    |
+//! | `cross_file`     | true → -10 penalty                                               |
 
 use serde::{Deserialize, Serialize};
 
@@ -38,78 +29,51 @@ pub enum PriorityLevel {
     Critical,
 }
 
-/// Computed priority attached to a finding.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Priority {
-    /// Discrete priority level for display/filtering.
-    pub level: PriorityLevel,
-    /// The raw WSJF score (higher = more urgent).
-    pub wsjf_score: f32,
-    /// Breakdown of component scores used (for transparency).
-    pub components: PriorityComponents,
-}
-
-/// Sub-scores that feed into the WSJF numerator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PriorityComponents {
-    pub business_value: f32,
-    pub time_criticality: f32,
-    pub risk_reduction: f32,
-    pub job_size_estimate: f32,
-}
-
-/// Compute [`Priority`] for a finding.
+/// Compute WSJF priority score for a finding.
 ///
 /// # Arguments
-/// * `severity` – normalized severity string (`"error"`, `"warning"`, `"high"`, `"info"`)
-/// * `scanner`  – scanner name (e.g. `"gitleaks"`, `"trivy"`, `"semgrep"`)
-/// * `has_autofix` – whether a suggested replacement is available
-pub fn compute_priority(severity: &str, scanner: &str, has_autofix: bool) -> Priority {
-    // Business value: based on severity
-    let business_value: f32 = match severity {
-        "error" | "high" | "critical" => 8.0,
-        "warning" | "medium" => 4.0,
-        _ => 1.0, // info / note
+/// * `severity` — normalized severity string: `"error"`, `"warning"`, `"info"`
+/// * `auto_fixable` — whether an automated fix is available
+/// * `auto_fix_category` — category of the fix tool (may be `None`)
+/// * `file_freq` — number of findings in the same file (capped at 10)
+/// * `cross_file` — whether the issue spans multiple files
+pub fn wsjf_score(
+    severity: &str,
+    auto_fixable: bool,
+    auto_fix_category: Option<&str>,
+    file_freq: u32,
+    cross_file: bool,
+) -> i32 {
+    let severity_score: i32 = match severity {
+        "error" | "high" | "critical" => 40,
+        "warning" | "medium" => 20,
+        "info" | "note" => 5,
+        _ => 0,
     };
 
-    // Time criticality: secrets and CVEs are most time-critical.
-    // Gitleaks findings always reach Critical level via explicit override below.
-    let time_criticality: f32 = match scanner {
-        "gitleaks" => 12.0, // exposed secrets must be rotated immediately
-        "trivy" => 8.0,     // CVEs have SLA obligations
-        "semgrep" => 2.0,
-        _ => 2.0,
+    let auto_fix_score: i32 = if auto_fixable { 20 } else { 0 };
+
+    let category_score: i32 = match auto_fix_category {
+        Some("formatter") | Some("import") => 20,
+        Some("linter") | Some("security") => 15,
+        Some("ast") | Some("deps") => 10,
+        _ => 0,
     };
 
-    // Risk reduction: items without an autofix carry more residual risk
-    let risk_reduction: f32 = if has_autofix { 2.0 } else { 5.0 };
+    let freq_score: i32 = file_freq.min(10) as i32;
 
-    // Job size: autofixable items cost less effort
-    let job_size_estimate: f32 = if has_autofix { 1.0 } else { 2.0 };
+    let cross_file_penalty: i32 = if cross_file { 10 } else { 0 };
 
-    let wsjf_score = (business_value + time_criticality + risk_reduction) / job_size_estimate;
+    severity_score + auto_fix_score + category_score + freq_score - cross_file_penalty
+}
 
-    // Secret scanners always warrant Critical, regardless of numeric score.
-    let level = if scanner == "gitleaks" {
-        PriorityLevel::Critical
-    } else {
-        match wsjf_score as u32 {
-            s if s >= 16 => PriorityLevel::Critical,
-            s if s >= 8 => PriorityLevel::High,
-            s if s >= 4 => PriorityLevel::Medium,
-            _ => PriorityLevel::Low,
-        }
-    };
-
-    Priority {
-        level,
-        wsjf_score,
-        components: PriorityComponents {
-            business_value,
-            time_criticality,
-            risk_reduction,
-            job_size_estimate,
-        },
+/// Map a raw WSJF score to a discrete priority level.
+pub fn priority_level(score: i32) -> PriorityLevel {
+    match score {
+        s if s >= 70 => PriorityLevel::Critical,
+        s if s >= 40 => PriorityLevel::High,
+        s if s >= 20 => PriorityLevel::Medium,
+        _ => PriorityLevel::Low,
     }
 }
 
@@ -118,26 +82,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn secret_finding_is_critical() {
-        let p = compute_priority("high", "gitleaks", false);
-        assert_eq!(p.level, PriorityLevel::Critical);
+    fn error_auto_fixable_formatter_max_score() {
+        // error(40) + auto_fixable(20) + formatter(20) + freq=10(10) - no_cross(0) = 90
+        let score = wsjf_score("error", true, Some("formatter"), 10, false);
+        assert_eq!(score, 90);
     }
 
     #[test]
-    fn info_semgrep_with_autofix_is_medium_or_lower() {
-        let p = compute_priority("info", "semgrep", true);
-        assert!(p.level <= PriorityLevel::Medium);
+    fn info_no_fix_no_freq() {
+        // info(5) + no_fix(0) + no_cat(0) + freq=0(0) - no_cross(0) = 5
+        let score = wsjf_score("info", false, None, 0, false);
+        assert_eq!(score, 5);
     }
 
     #[test]
-    fn trivy_error_is_high_or_above() {
-        let p = compute_priority("error", "trivy", false);
-        assert!(p.level >= PriorityLevel::High);
+    fn cross_file_penalty_applied() {
+        // warning(20) + no_fix(0) + no_cat(0) + freq=5(5) - cross_file(10) = 15
+        let score = wsjf_score("warning", false, None, 5, true);
+        assert_eq!(score, 15);
     }
 
     #[test]
-    fn wsjf_score_is_positive() {
-        let p = compute_priority("warning", "clippy", true);
-        assert!(p.wsjf_score > 0.0);
+    fn file_freq_capped_at_10() {
+        // error(40) with huge file_freq — capped at 10
+        let score_100 = wsjf_score("error", false, None, 100, false);
+        let score_10 = wsjf_score("error", false, None, 10, false);
+        assert_eq!(score_100, score_10, "file_freq must be capped at 10");
+        assert_eq!(score_100, 50);
+    }
+
+    #[test]
+    fn linter_category_scores_15() {
+        let score = wsjf_score("error", true, Some("linter"), 0, false);
+        // error(40) + auto_fix(20) + linter(15) = 75
+        assert_eq!(score, 75);
+    }
+
+    #[test]
+    fn priority_level_thresholds() {
+        assert_eq!(priority_level(90), PriorityLevel::Critical);
+        assert_eq!(priority_level(70), PriorityLevel::Critical);
+        assert_eq!(priority_level(69), PriorityLevel::High);
+        assert_eq!(priority_level(40), PriorityLevel::High);
+        assert_eq!(priority_level(39), PriorityLevel::Medium);
+        assert_eq!(priority_level(20), PriorityLevel::Medium);
+        assert_eq!(priority_level(19), PriorityLevel::Low);
+        assert_eq!(priority_level(0), PriorityLevel::Low);
     }
 }

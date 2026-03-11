@@ -1,124 +1,85 @@
-//! Output serialization — produces the AI-ready JSON report.
+//! Output serialization — produces the AI-ready JSON report files.
 //!
-//! # Output Schema
+//! # Output Files
 //!
-//! ```json
-//! {
-//!   "version": "0.1.1",
-//!   "scanned_at": "2025-01-01T00:00:00Z",
-//!   "project_root": "/path/to/project",
-//!   "summary": {
-//!     "total": 12,
-//!     "by_severity": { "error": 2, "warning": 8, "info": 2 },
-//!     "by_scanner": { "semgrep": 5, "clippy": 7 },
-//!     "autofixable": 3
-//!   },
-//!   "issues": [ ... ]
-//! }
+//! ```text
+//! reports/<project>/<timestamp>/
+//! ├── issues.json              # All issues, priority-sorted descending
+//! ├── issues-fixable.json      # Issues where fix.auto_fixable = true
+//! ├── issues-remaining.json    # Issues where fix.auto_fixable = false
+//! ├── summary.json             # Scan metadata and counts
+//! └── summary.txt              # Human-readable ASCII table
 //! ```
 
-use std::{
-    collections::HashMap,
-    io::{self, Write},
-    path::Path,
-};
+pub mod summary;
 
-use serde::{Deserialize, Serialize};
+pub use summary::ScanSummary;
 
 use crate::issue::Issue;
 
-/// Top-level report serialized to JSON.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ScanReport {
-    /// rice-guard schema version (semver).
-    pub version: String,
-    /// ISO-8601 timestamp when the scan ran.
-    pub scanned_at: String,
-    /// Absolute path of the scanned project.
-    pub project_root: String,
-    /// Aggregated counts over all findings.
-    pub summary: ScanSummary,
-    /// Ordered list of findings (sorted by WSJF score descending).
-    pub issues: Vec<Issue>,
-}
-
-/// Aggregated statistics over all findings.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ScanSummary {
-    /// Total number of unique issues.
-    pub total: usize,
-    /// Count grouped by normalized severity string.
-    pub by_severity: HashMap<String, usize>,
-    /// Count grouped by scanner name.
-    pub by_scanner: HashMap<String, usize>,
-    /// Number of issues that have an automated fix available.
-    pub autofixable: usize,
-}
-
-impl ScanSummary {
-    /// Build a [`ScanSummary`] from a slice of [`Issue`]s.
-    pub fn from_issues(issues: &[Issue]) -> Self {
-        let mut by_severity: HashMap<String, usize> = HashMap::new();
-        let mut by_scanner: HashMap<String, usize> = HashMap::new();
-        let mut autofixable = 0usize;
-
-        for issue in issues {
-            *by_severity.entry(issue.severity.clone()).or_insert(0) += 1;
-            *by_scanner.entry(issue.scanner.clone()).or_insert(0) += 1;
-
-            use crate::issue::fix::FixCategory;
-            if issue.fix.category == FixCategory::ScannerAutofix
-                || issue.fix.category == FixCategory::FormatterApplicable
-                || issue.fix.category == FixCategory::PackageManagerFix
-            {
-                autofixable += 1;
-            }
-        }
-
-        ScanSummary {
-            total: issues.len(),
-            by_severity,
-            by_scanner,
-            autofixable,
-        }
-    }
-}
-
-/// Writes the formatted report.
+/// Writes all output files from a completed scan.
+///
+/// This is a stub — full implementation in Plan 03-04.
+#[allow(dead_code)]
 pub struct OutputWriter;
 
 impl OutputWriter {
-    /// Serialize `report` as pretty-printed JSON and write to `writer`.
-    pub fn write_json(report: &ScanReport, writer: &mut dyn Write) -> io::Result<()> {
-        let json = serde_json::to_string_pretty(report).map_err(io::Error::other)?;
-        writer.write_all(json.as_bytes())?;
-        writer.write_all(b"\n")
+    /// Write all output files for a completed scan.
+    ///
+    /// Produces:
+    /// - `issues.json` (all issues, WSJF-sorted)
+    /// - `issues-fixable.json` (auto_fixable = true)
+    /// - `issues-remaining.json` (auto_fixable = false)
+    /// - `summary.json`
+    /// - `summary.txt`
+    pub fn write_all(&self, _issues: &[Issue], _summary: &ScanSummary) -> anyhow::Result<()> {
+        todo!("implement in Plan 03-04")
     }
 
-    /// Build a [`ScanReport`] from `issues`, sorted by WSJF score descending.
-    pub fn build_report(
-        issues: Vec<Issue>,
-        project_root: &Path,
-        version: &str,
+    /// Build a [`ScanSummary`] from a slice of [`Issue`]s.
+    pub fn build_summary(
+        issues: &[Issue],
+        project_path: &str,
         scanned_at: &str,
-    ) -> ScanReport {
-        let mut sorted = issues;
-        sorted.sort_by(|a, b| {
-            b.priority
-                .wsjf_score
-                .partial_cmp(&a.priority.wsjf_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        scanners_run: Vec<String>,
+        scan_duration_ms: u64,
+    ) -> ScanSummary {
+        use std::collections::HashMap;
 
-        let summary = ScanSummary::from_issues(&sorted);
+        let total_issues = issues.len();
+        let fixable_count = issues.iter().filter(|i| i.fix.auto_fixable).count();
+        let remaining_count = total_issues - fixable_count;
 
-        ScanReport {
-            version: version.to_string(),
-            scanned_at: scanned_at.to_string(),
-            project_root: project_root.to_string_lossy().to_string(),
-            summary,
-            issues: sorted,
+        let mut by_severity: HashMap<String, usize> = HashMap::new();
+        let mut by_complexity: HashMap<String, usize> = HashMap::new();
+
+        for issue in issues {
+            *by_severity.entry(issue.severity.clone()).or_insert(0) += 1;
+
+            let complexity = match &issue.fix.complexity {
+                crate::issue::FixComplexity::Trivial => "trivial",
+                crate::issue::FixComplexity::Moderate => "moderate",
+                crate::issue::FixComplexity::Complex => "complex",
+            };
+            *by_complexity.entry(complexity.to_string()).or_insert(0) += 1;
         }
+
+        ScanSummary {
+            scanned_at: scanned_at.to_string(),
+            project_path: project_path.to_string(),
+            total_issues,
+            fixable_count,
+            remaining_count,
+            by_severity,
+            by_complexity,
+            scanners_run,
+            scan_duration_ms,
+        }
+    }
+
+    /// Sort issues by WSJF priority score, highest first.
+    pub fn sort_by_priority(issues: &mut [Issue]) {
+        issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
     }
 }
 
@@ -126,23 +87,81 @@ impl OutputWriter {
 mod tests {
     use super::*;
 
-    fn make_empty_report() -> ScanReport {
-        OutputWriter::build_report(vec![], Path::new("/tmp/project"), "0.1.1", "2025-01-01")
+    fn make_issue(severity: &str, auto_fixable: bool, score: i32) -> Issue {
+        use crate::issue::{EvidenceBlock, FixComplexity, FixMetadata, VerificationInfo};
+
+        Issue {
+            id: format!("test-{severity}-{score}"),
+            rule_id: "test-rule".to_string(),
+            severity: severity.to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 1,
+            message: "test message".to_string(),
+            scanner: "semgrep".to_string(),
+            evidence: EvidenceBlock {
+                matched_code: String::new(),
+                context_before: vec![],
+                context_after: vec![],
+                enclosing_function: None,
+                enclosing_class: None,
+                imports: vec![],
+            },
+            fix: FixMetadata {
+                auto_fixable,
+                auto_fix_tool: None,
+                auto_fix_category: None,
+                suggested_replacement: None,
+                complexity: FixComplexity::Trivial,
+            },
+            verification: VerificationInfo {
+                rerun_command: "rice-guard scan .".to_string(),
+                success_condition: "no findings".to_string(),
+            },
+            priority_score: score,
+            cross_file: false,
+        }
     }
 
     #[test]
-    fn empty_report_serializes() {
-        let report = make_empty_report();
-        let mut buf = Vec::new();
-        OutputWriter::write_json(&report, &mut buf).unwrap();
-        let s = String::from_utf8(buf).unwrap();
-        assert!(s.contains("\"total\": 0"));
+    fn sort_by_priority_highest_first() {
+        let mut issues = vec![
+            make_issue("info", false, 5),
+            make_issue("error", true, 90),
+            make_issue("warning", false, 20),
+        ];
+        OutputWriter::sort_by_priority(&mut issues);
+        assert_eq!(issues[0].priority_score, 90);
+        assert_eq!(issues[1].priority_score, 20);
+        assert_eq!(issues[2].priority_score, 5);
     }
 
     #[test]
-    fn empty_summary_has_zero_counts() {
-        let summary = ScanSummary::from_issues(&[]);
-        assert_eq!(summary.total, 0);
-        assert_eq!(summary.autofixable, 0);
+    fn build_summary_counts() {
+        let issues = vec![
+            make_issue("error", true, 90),
+            make_issue("warning", false, 20),
+            make_issue("info", false, 5),
+        ];
+        let summary = OutputWriter::build_summary(
+            &issues,
+            "/project",
+            "2026-03-11T00:00:00Z",
+            vec!["semgrep".to_string()],
+            1000,
+        );
+        assert_eq!(summary.total_issues, 3);
+        assert_eq!(summary.fixable_count, 1);
+        assert_eq!(summary.remaining_count, 2);
+        assert_eq!(summary.by_severity["error"], 1);
+        assert_eq!(summary.by_severity["warning"], 1);
+    }
+
+    #[test]
+    fn empty_issues_summary() {
+        let summary =
+            OutputWriter::build_summary(&[], "/project", "2026-03-11T00:00:00Z", vec![], 0);
+        assert_eq!(summary.total_issues, 0);
+        assert_eq!(summary.fixable_count, 0);
+        assert_eq!(summary.remaining_count, 0);
     }
 }

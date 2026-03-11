@@ -1,31 +1,44 @@
-//! Issue domain model — the normalized representation of a single finding.
+//! Issue domain model — the normalized, AI-ready representation of a finding.
 //!
-//! A finding from any scanner (`RawFinding`) is enriched into an `Issue` by
-//! attaching evidence, fix metadata, and a WSJF priority score.
+//! A `RawFinding` from any scanner is enriched into an `Issue` by attaching:
+//! - Pre-embedded code evidence (matched code, context lines, enclosing scope)
+//! - Fix metadata (auto-fixable flag, tool, category, complexity)
+//! - Verification info (how to confirm the fix worked)
+//! - A WSJF priority score
+//!
+//! ## Module Structure
+//!
+//! - `evidence` — [`EvidenceBlock`] and extraction logic
+//! - `fix_meta` — [`FixMetadata`] and [`FixComplexity`]
+//! - `verification` — [`VerificationInfo`]
+//! - `priority` — [`wsjf_score`] and [`priority_level`] functions
+//! - `builder` — [`IssueBuilder`] and [`fingerprint`] (content-hash ID)
 
 pub mod builder;
 pub mod evidence;
-pub mod fix;
+pub mod fix_meta;
 pub mod priority;
+pub mod verification;
+
+pub use builder::{fingerprint, IssueBuilder};
+pub use evidence::{extract_evidence_block, EvidenceBlock, CONTEXT_LINES};
+pub use fix_meta::{FixComplexity, FixMetadata};
+pub use priority::{priority_level, wsjf_score, PriorityLevel};
+pub use verification::VerificationInfo;
 
 use serde::{Deserialize, Serialize};
 
-use evidence::Evidence;
-use fix::FixMetadata;
-use priority::Priority;
-
-/// A fully-enriched finding ready for reporting and AI analysis.
+/// A fully-enriched finding ready for AI-assisted analysis and reporting.
 ///
-/// Constructed via [`builder::IssueBuilder::build`].
+/// Constructed via [`IssueBuilder::build`]. Serializes to the AI-ready JSON
+/// output format where all evidence is pre-embedded so any AI tool can reason
+/// about the issue without reading source files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Issue {
-    /// Stable, deterministic fingerprint ID formed from scanner + rule + file + line.
+    /// Stable, deterministic content-hash ID (SHA-256 of rule_id + path + code).
     ///
-    /// Format: `<scanner>/<rule_id>@<file>:<line>`
+    /// Does NOT include line number — stable when formatters shift code.
     pub id: String,
-
-    /// Scanner that produced this finding (e.g. `"semgrep"`, `"trivy"`, `"clippy"`).
-    pub scanner: String,
 
     /// Rule identifier from the scanner (e.g. `"semgrep.python.security.sql-injection"`).
     pub rule_id: String,
@@ -42,12 +55,24 @@ pub struct Issue {
     /// Human-readable description of the issue.
     pub message: String,
 
-    /// Code evidence for the finding (scanner-provided or line-window fallback).
-    pub evidence: Evidence,
+    /// Scanner that produced this finding (e.g. `"semgrep"`, `"trivy"`, `"clippy"`).
+    pub scanner: String,
 
-    /// Fix metadata: category, tool, snippet, and shell command.
+    /// Pre-embedded code evidence (matched code, context, enclosing scope, imports).
+    pub evidence: EvidenceBlock,
+
+    /// Fix metadata: auto-fixable flag, tool, category, complexity.
     pub fix: FixMetadata,
 
-    /// WSJF-derived priority level and score.
-    pub priority: Priority,
+    /// Verification instructions: command and expected success condition.
+    pub verification: VerificationInfo,
+
+    /// WSJF priority score (higher = more urgent).
+    ///
+    /// Formula: severity(40) + auto_fixable(20) + category(20) + file_freq(10) - cross_file(10)
+    pub priority_score: i32,
+
+    /// Whether this issue spans multiple files (architecture violation, etc.).
+    /// Applies a -10 score penalty.
+    pub cross_file: bool,
 }
