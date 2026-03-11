@@ -1,6 +1,7 @@
 pub mod diff;
 mod engine;
 mod output_dir;
+pub mod parser;
 mod raw_result;
 pub mod runner;
 
