@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt check
+        run: cargo fmt --all --check
+      - name: cargo clippy
+        run: cargo clippy -- -D warnings
+      - name: cargo test
+        run: cargo test
+
+  cross-compile:
+    name: Cross-compile (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            install: musl-tools
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            install: gcc-aarch64-linux-gnu musl-tools
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            install: ""
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            install: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            install: ""
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Install cross-compile deps (Linux)
+        if: matrix.install != ''
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.install }}
+      - name: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
