@@ -11,6 +11,7 @@
 //! └── summary.txt              # Human-readable ASCII table
 //! ```
 
+pub mod files;
 pub mod summary;
 
 pub use summary::ScanSummary;
