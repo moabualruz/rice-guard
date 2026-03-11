@@ -1,0 +1,14 @@
+name: custom-linter
+version: ">=0.1"
+languages: [rust]
+install:
+  check: "custom-linter --version"
+  cargo: "cargo install custom-linter"
+commands:
+  scan:
+    cmd: "custom-linter --json -o {{output_dir}}/custom.json ."
+    timeout: 60
+output_format: json
+severity_map:
+  ERROR: high
+  WARNING: medium

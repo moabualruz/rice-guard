@@ -42,6 +42,27 @@ pub struct RiceGuardConfig {
     pub ci: CiConfig,
 }
 
+impl Default for RiceGuardConfig {
+    fn default() -> Self {
+        Self {
+            version: "1".to_string(),
+            project: ProjectConfig {
+                name: String::new(),
+                languages: Vec::new(),
+                topology: Topology::default(),
+                architecture: Architecture::default(),
+            },
+            scanners: ScannersConfig::default(),
+            fixers: FixersConfig::default(),
+            filters: FiltersConfig::default(),
+            tools: ToolsConfig::default(),
+            output: OutputConfig::default(),
+            hooks: HooksConfig::default(),
+            ci: CiConfig::default(),
+        }
+    }
+}
+
 // ── Project ─────────────────────────────────────────────────────────────────
 
 /// Project identity and detected language metadata.

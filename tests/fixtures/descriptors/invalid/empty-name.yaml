@@ -1,0 +1,11 @@
+name: ""
+version: ">=1.0"
+languages: []
+install:
+  check: ""
+commands:
+  scan:
+    cmd: ""
+    timeout: 60
+output_format: json
+severity_map: {}

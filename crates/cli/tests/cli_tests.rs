@@ -5,6 +5,41 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use std::process::Command;
 
+// ── Additional integration tests (Plan 01-05) ────────────────────────────────
+
+/// `rice-guard scan --help` exits 0 (covers CLI-02 help discoverability).
+#[test]
+fn scan_help_exits_zero() {
+    rice_guard().args(["scan", "--help"]).assert().success();
+}
+
+/// `rice-guard version` (subcommand) exits 0 and stdout contains the package version.
+#[test]
+fn version_subcommand_contains_pkg_version() {
+    rice_guard()
+        .arg("version")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
+}
+
+/// `rice-guard init . --yes` with piped (non-TTY) stdin exits 0.
+///
+/// --yes mode must not require a TTY. Pipe empty stdin to ensure no TTY is
+/// allocated. Requires `scc` in PATH; marked `#[ignore]` when running in
+/// environments where scc is unavailable.
+#[test]
+#[ignore = "Requires scc in PATH — run manually or in CI with scc installed"]
+fn init_yes_no_tty_exits_zero() {
+    // Use assert_cmd::Command (not std::process::Command) for write_stdin support.
+    assert_cmd::Command::cargo_bin("rice-guard")
+        .unwrap()
+        .args(["init", ".", "--yes"])
+        .write_stdin("")
+        .assert()
+        .success();
+}
+
 fn rice_guard() -> Command {
     Command::cargo_bin("rice-guard").unwrap()
 }
