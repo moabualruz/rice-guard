@@ -222,8 +222,8 @@ async fn scan_01_no_enabled_scanners_returns_empty_vec() {
     use rice_guard_core::config::RiceGuardConfig;
 
     let base = tempfile::tempdir().expect("tempdir");
-    let output_dir = OutputDir::new("test-project", base.path().to_str().unwrap())
-        .expect("OutputDir::new");
+    let output_dir =
+        OutputDir::new("test-project", base.path().to_str().unwrap()).expect("OutputDir::new");
 
     // RiceGuardConfig::default() has no scanners enabled in tools.scanners.
     let engine = ScannerEngine::new(vec![], RiceGuardConfig::default());
@@ -242,7 +242,11 @@ async fn scan_01_no_enabled_scanners_returns_empty_vec() {
 #[test]
 fn scan_03_quick_scanners_constant_has_four_entries() {
     use rice_guard_core::scanner::QUICK_SCANNERS;
-    assert_eq!(QUICK_SCANNERS.len(), 4, "QUICK_SCANNERS must have 4 entries");
+    assert_eq!(
+        QUICK_SCANNERS.len(),
+        4,
+        "QUICK_SCANNERS must have 4 entries"
+    );
     assert!(QUICK_SCANNERS.contains(&"semgrep"));
     assert!(QUICK_SCANNERS.contains(&"trivy"));
     assert!(QUICK_SCANNERS.contains(&"jscpd"));
@@ -273,8 +277,8 @@ async fn scan_03_quick_mode_selects_correct_subset() {
     let descriptors = load_scanner_descriptors(tmp.path()).expect("load built-ins");
     assert_eq!(descriptors.len(), 5, "5 built-in descriptors");
 
-    let output_dir = OutputDir::new("test-project", tmp.path().to_str().unwrap())
-        .expect("OutputDir::new");
+    let output_dir =
+        OutputDir::new("test-project", tmp.path().to_str().unwrap()).expect("OutputDir::new");
 
     // No scanners enabled in tools.scanners => all Unavailable (warn + skip).
     // We just verify that the call completes without panic for Quick mode.
@@ -297,8 +301,8 @@ async fn scan_04_security_mode_no_enabled_scanners_returns_empty() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let descriptors = load_scanner_descriptors(tmp.path()).expect("load built-ins");
 
-    let output_dir = OutputDir::new("test-project", tmp.path().to_str().unwrap())
-        .expect("OutputDir::new");
+    let output_dir =
+        OutputDir::new("test-project", tmp.path().to_str().unwrap()).expect("OutputDir::new");
 
     let engine = ScannerEngine::new(descriptors, RiceGuardConfig::default());
     let result = engine
@@ -319,8 +323,8 @@ async fn scan_05_diff_only_non_git_dir_falls_back_gracefully() {
 
     // Use a tempdir that is NOT a git repo.
     let tmp = tempfile::tempdir().expect("tempdir");
-    let output_dir = OutputDir::new("test-project", tmp.path().to_str().unwrap())
-        .expect("OutputDir::new");
+    let output_dir =
+        OutputDir::new("test-project", tmp.path().to_str().unwrap()).expect("OutputDir::new");
 
     let engine = ScannerEngine::new(vec![], RiceGuardConfig::default());
     // Should return Ok (graceful fallback), not panic or error.

@@ -123,10 +123,11 @@ impl ScannerEngine {
 
             set.spawn(async move {
                 let raw = run_one_scanner(&desc, &cfg, &out, &tgt, &m).await?;
-                let findings = parse_scanner_output(&raw).map_err(|e| ScannerRunError::SpawnFailed {
-                    scanner: raw.scanner.clone(),
-                    reason: e.to_string(),
-                })?;
+                let findings =
+                    parse_scanner_output(&raw).map_err(|e| ScannerRunError::SpawnFailed {
+                        scanner: raw.scanner.clone(),
+                        reason: e.to_string(),
+                    })?;
                 Ok((raw.scanner, findings))
             });
         }
@@ -182,9 +183,7 @@ impl ScannerEngine {
                 }
                 Ok(_empty) => {
                     // Empty changed_files => no filter; return all findings (full-scan semantics).
-                    tracing::warn!(
-                        "diff-only: no changed files detected; returning all findings"
-                    );
+                    tracing::warn!("diff-only: no changed files detected; returning all findings");
                 }
                 Err(e) => {
                     // Not a git repo or git error — fall back to full results.
