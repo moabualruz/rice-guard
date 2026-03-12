@@ -10,5 +10,8 @@ pub mod mcp;
 pub mod report;
 pub mod scan;
 pub mod serve;
+// Phase 6 scaffold — items used in Plan 02 (enroll/report implementation).
+#[allow(dead_code)]
+pub mod sonar;
 pub mod status;
 pub mod version;
