@@ -91,17 +91,21 @@ mod tests {
         );
     }
 
-    // Integration tests that require a running MCP server remain #[ignore].
-    // These are enabled once the full server integration is verified in production.
     #[tokio::test]
-    #[ignore]
+    #[ignore = "integration: requires real scanner tools installed (semgrep, trivy, etc.)"]
     async fn mcp_scan_tool_returns_json() {
+        // This test requires real scanner binaries to be present in PATH.
+        // It exercises the full scan tool call through the MCP protocol layer.
+        // Run manually: cargo test -p rice-guard-server mcp_scan_tool -- --ignored
         todo!()
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "integration: requires MCP client (Claude Code or Cursor) — test manually via `rice-guard mcp`"]
     async fn mcp_get_issues_returns_array() {
+        // This test requires a live MCP client connecting over stdin/stdout.
+        // It exercises the get_issues tool through the full JSON-RPC transport.
+        // Run manually: configure rice-guard as an MCP server in Claude Code or Cursor.
         todo!()
     }
 }
