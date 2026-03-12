@@ -74,3 +74,16 @@ schemars = "0.8"
 # Workspace crates
 rice-guard-core = { path = "crates/core" }
 rice-guard-server = { path = "crates/server" }
+
+# ── Distribution (cargo-dist) ────────────────────────────────────────────────
+[workspace.metadata.dist]
+cargo-dist-version = "0.27.0"
+ci = "github"
+installers = ["shell", "powershell", "homebrew", "npm"]
+targets = [
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
