@@ -1,5 +1,5 @@
 /// Scan subcommand handler — full implementation (Phase 2, Plan 04-06 / Phase 3, Plan 04).
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Instant;
 
 use crate::args::ScanArgs;
@@ -148,65 +148,69 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     }
 
     // ── Step 11: Phase 3 pipeline — enrich findings into Issues ──────────────
-    use rice_guard_core::issue::{
-        file_freq_map, sort_issues, EvidenceBlock, EvidenceExtractor, IssueBuilder,
-    };
+    use rice_guard_core::issue::{sort_issues, FixerDescriptorInfo, IssueBuilder};
     use rice_guard_core::output::{OutputWriter, ScanSummary};
 
-    let freq_map: HashMap<String, u32> = file_freq_map(&findings);
-    let extractor = EvidenceExtractor::new();
+    // Load fixer descriptors and convert to FixerDescriptorInfo for build_batch().
+    // On failure, fall back to an empty list — scan still works, just without
+    // descriptor-driven auto_fixable detection.
+    let fixer_descriptor_infos: Vec<FixerDescriptorInfo> =
+        match rice_guard_core::registry::loader::load_fixer_descriptors(&target) {
+            Ok(fds) => fds
+                .into_iter()
+                .map(|fd| {
+                    // Collect present stage names in pipeline order.
+                    let mut stages: Vec<String> = Vec::new();
+                    if !fd.stages.format.is_empty() {
+                        stages.push("formatters".to_string());
+                    }
+                    if !fd.stages.lint.is_empty() {
+                        stages.push("linters".to_string());
+                    }
+                    if !fd.stages.security.is_empty() {
+                        stages.push("security".to_string());
+                    }
+                    if !fd.stages.ast.is_empty() {
+                        stages.push("ast".to_string());
+                    }
+                    if !fd.stages.deps.is_empty() {
+                        stages.push("deps".to_string());
+                    }
+                    if !fd.stages.import.is_empty() {
+                        stages.push("import".to_string());
+                    }
 
-    // Group findings by file_path (one parse per file, EVID-04).
-    let mut by_file: HashMap<String, Vec<usize>> = HashMap::new();
-    for (idx, finding) in findings.iter().enumerate() {
-        by_file
-            .entry(finding.file_path.clone())
-            .or_default()
-            .push(idx);
-    }
+                    // First fix command from any stage, used as the reported fix_tool.
+                    let fix_tool = fd
+                        .stages
+                        .format
+                        .first()
+                        .or_else(|| fd.stages.lint.first())
+                        .or_else(|| fd.stages.security.first())
+                        .or_else(|| fd.stages.ast.first())
+                        .or_else(|| fd.stages.deps.first())
+                        .or_else(|| fd.stages.import.first())
+                        .map(|step| step.fix.clone());
 
-    // Pre-read source files.
-    let mut file_sources: HashMap<String, Option<String>> = HashMap::new();
-    for file_path in by_file.keys() {
-        let norm = file_path.replace('/', std::path::MAIN_SEPARATOR_STR);
-        let abs_path = target.join(&norm);
-        let source = std::fs::read_to_string(&abs_path).ok();
-        file_sources.insert(file_path.clone(), source);
-    }
-
-    // Build Issues — one per finding, with evidence extracted per-file.
-    let mut issues = Vec::with_capacity(findings.len());
-
-    for (file_path, indices) in &by_file {
-        let file_findings: Vec<&rice_guard_core::scanner::RawFinding> =
-            indices.iter().map(|&i| &findings[i]).collect();
-
-        // Extract all evidence blocks for this file in one parse pass.
-        let evidence_map = if let Some(Some(source)) = file_sources.get(file_path) {
-            extractor.extract_file(file_path, source, &file_findings)
-        } else {
-            HashMap::new()
+                    FixerDescriptorInfo {
+                        language: fd.language.clone(),
+                        stages,
+                        fix_tool,
+                    }
+                })
+                .collect(),
+            Err(e) => {
+                tracing::warn!("Failed to load fixer descriptors: {}; using empty list", e);
+                vec![]
+            }
         };
 
-        for finding in &file_findings {
-            // Look up pre-extracted evidence; fall back to empty block.
-            let evidence = evidence_map
-                .get(&(finding.rule_id.clone(), finding.line))
-                .cloned()
-                .unwrap_or_else(|| EvidenceBlock {
-                    matched_code: finding.matched_code.clone().unwrap_or_default(),
-                    context_before: vec![],
-                    context_after: vec![],
-                    enclosing_function: None,
-                    enclosing_class: None,
-                    imports: vec![],
-                });
-
-            let file_freq = freq_map.get(&finding.file_path).copied().unwrap_or(1);
-            let issue = IssueBuilder::build_with_evidence(finding, evidence, file_freq);
-            issues.push(issue);
-        }
-    }
+    // Build all issues in one descriptor-driven batch call.
+    // build_batch() internally:
+    //   - Uses file_freq_with_churn() for scoring (git churn + issue count)
+    //   - Detects cross_file when rule_id appears in 3+ distinct files
+    //   - Uses descriptor-driven FixMetadata via fixer_descriptor_infos
+    let mut issues = IssueBuilder::build_batch(&findings, &target, &fixer_descriptor_infos);
 
     sort_issues(&mut issues);
 
