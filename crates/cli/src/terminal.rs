@@ -327,7 +327,10 @@ pub fn print_fix_summary_table(report: &FixReport) {
             report.stages.len()
         );
     } else {
-        println!("\nFix pipeline{dry_label}: {} stage(s)\n", report.stages.len());
+        println!(
+            "\nFix pipeline{dry_label}: {} stage(s)\n",
+            report.stages.len()
+        );
     }
 
     // Column header

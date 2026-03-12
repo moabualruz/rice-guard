@@ -12,8 +12,8 @@
 ///          without `--yes` in a non-TTY environment.
 use std::time::Instant;
 
-use rice_guard_core::fixer::{FixerEngine, FixReport, StageFilter};
 use rice_guard_core::fixer::engine::FixerEngineConfig;
+use rice_guard_core::fixer::{FixReport, FixerEngine, StageFilter};
 use rice_guard_core::registry::DescriptorRegistry;
 
 use crate::args::FixArgs;
@@ -52,7 +52,10 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
         match rice_guard_core::registry::loader::load_fixer_descriptors(&project_root) {
             Ok(d) => d,
             Err(e) => {
-                tracing::warn!("Failed to load fixer descriptors: {}; continuing with empty list", e);
+                tracing::warn!(
+                    "Failed to load fixer descriptors: {}; continuing with empty list",
+                    e
+                );
                 vec![]
             }
         };
@@ -60,7 +63,10 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
 
     // ── Step 4: handle --issue / --issues auto-scan-if-missing ───────────────
     let issue_ids: Option<Vec<String>> = if args.issue.is_some() || args.issues.is_some() {
-        let latest_issues = project_root.join("reports").join("latest").join("issues.json");
+        let latest_issues = project_root
+            .join("reports")
+            .join("latest")
+            .join("issues.json");
         if !latest_issues.exists() {
             tracing::info!("issues.json not found — running scan first");
             output::print_info("No issues.json found — running scan first...");
@@ -124,7 +130,11 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
             }
         }
 
-        if ids.is_empty() { None } else { Some(ids) }
+        if ids.is_empty() {
+            None
+        } else {
+            Some(ids)
+        }
     } else {
         None
     };
@@ -172,20 +182,17 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
     }
 
     // ── Step 6: set up output directories ────────────────────────────────────
-    let reports_base = project_root
-        .join("reports")
-        .to_string_lossy()
-        .to_string();
+    let reports_base = project_root.join("reports").to_string_lossy().to_string();
 
     let fix_prefix = format!("fix-{}", config.project.name);
-    let fix_output_dir =
-        match rice_guard_core::scanner::OutputDir::new(&fix_prefix, &reports_base) {
-            Ok(d) => d,
-            Err(e) => {
-                output::print_error(&format!("Failed to create fix output directory: {e}"));
-                return Ok(2);
-            }
-        };
+    let fix_output_dir = match rice_guard_core::scanner::OutputDir::new(&fix_prefix, &reports_base)
+    {
+        Ok(d) => d,
+        Err(e) => {
+            output::print_error(&format!("Failed to create fix output directory: {e}"));
+            return Ok(2);
+        }
+    };
 
     let latest_dir = project_root.join("reports").join("latest");
     if let Err(e) = std::fs::create_dir_all(&latest_dir) {
