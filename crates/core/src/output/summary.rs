@@ -37,6 +37,13 @@ pub struct ScanSummary {
 
     /// Total wall-clock duration of the scan in milliseconds.
     pub scan_duration_ms: u64,
+
+    /// Count of auto-fixable issues grouped by fix category.
+    ///
+    /// Keys match fixer descriptor stage names: `"formatters"`, `"linters"`,
+    /// `"security"`, `"ast"`, `"deps"`. Only categories with count > 0 appear
+    /// (sparse map). Consumed by the Phase 4 fix pipeline.
+    pub fix_queue_by_category: HashMap<String, usize>,
 }
 
 impl ScanSummary {
@@ -55,6 +62,7 @@ impl ScanSummary {
 
         let mut by_severity: HashMap<String, usize> = HashMap::new();
         let mut by_complexity: HashMap<String, usize> = HashMap::new();
+        let mut fix_queue_by_category: HashMap<String, usize> = HashMap::new();
 
         for issue in issues {
             *by_severity.entry(issue.severity.clone()).or_insert(0) += 1;
@@ -65,6 +73,21 @@ impl ScanSummary {
                 FixComplexity::Complex => "complex",
             };
             *by_complexity.entry(complexity.to_string()).or_insert(0) += 1;
+
+            if issue.fix.auto_fixable {
+                // Map singular category names to plural stage keys used by the fix pipeline.
+                let stage_key = match issue.fix.auto_fix_category.as_deref() {
+                    Some("formatter") => "formatters",
+                    Some("linter") => "linters",
+                    Some("security") => "security",
+                    Some("ast") => "ast",
+                    Some("deps") => "deps",
+                    _ => continue,
+                };
+                *fix_queue_by_category
+                    .entry(stage_key.to_string())
+                    .or_insert(0) += 1;
+            }
         }
 
         let scanned_at = chrono::Utc::now().to_rfc3339();
@@ -79,6 +102,7 @@ impl ScanSummary {
             by_complexity,
             scanners_run,
             scan_duration_ms: duration_ms,
+            fix_queue_by_category,
         }
     }
 }
@@ -102,6 +126,7 @@ mod tests {
             by_complexity: HashMap::from([("trivial".to_string(), 2usize)]),
             scanners_run: vec!["semgrep".to_string()],
             scan_duration_ms: 500,
+            fix_queue_by_category: HashMap::new(),
         };
 
         let json = serde_json::to_string(&summary).expect("serialize");
@@ -122,6 +147,7 @@ mod tests {
             by_complexity: HashMap::new(),
             scanners_run: vec![],
             scan_duration_ms: 0,
+            fix_queue_by_category: HashMap::new(),
         };
         assert_eq!(
             summary.fixable_count + summary.remaining_count,
@@ -161,6 +187,7 @@ mod tests {
                 success_condition: "no findings".to_string(),
             },
             priority_score: 20,
+            priority_tier: "medium".to_string(),
             cross_file: false,
         };
 

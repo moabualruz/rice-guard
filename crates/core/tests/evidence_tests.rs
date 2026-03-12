@@ -336,6 +336,7 @@ mod evidence_tests {
             fix,
             verification,
             priority_score: 20,
+            priority_tier: "medium".to_string(),
             cross_file: false,
         };
 

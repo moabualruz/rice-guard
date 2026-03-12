@@ -74,6 +74,11 @@ pub struct Issue {
     /// Formula: severity(40) + auto_fixable(20) + category(20) + file_freq(10) - cross_file(10)
     pub priority_score: i32,
 
+    /// Human-readable priority tier derived from `priority_score`.
+    ///
+    /// One of `"critical"` (≥70), `"high"` (≥40), `"medium"` (≥20), or `"low"` (<20).
+    pub priority_tier: String,
+
     /// Whether this issue spans multiple files (architecture violation, etc.).
     /// Applies a -10 score penalty.
     pub cross_file: bool,

@@ -75,6 +75,7 @@ impl OutputWriter {
 
         let mut by_severity: HashMap<String, usize> = HashMap::new();
         let mut by_complexity: HashMap<String, usize> = HashMap::new();
+        let mut fix_queue_by_category: HashMap<String, usize> = HashMap::new();
 
         for issue in issues {
             *by_severity.entry(issue.severity.clone()).or_insert(0) += 1;
@@ -85,6 +86,20 @@ impl OutputWriter {
                 crate::issue::FixComplexity::Complex => "complex",
             };
             *by_complexity.entry(complexity.to_string()).or_insert(0) += 1;
+
+            if issue.fix.auto_fixable {
+                let stage_key = match issue.fix.auto_fix_category.as_deref() {
+                    Some("formatter") => "formatters",
+                    Some("linter") => "linters",
+                    Some("security") => "security",
+                    Some("ast") => "ast",
+                    Some("deps") => "deps",
+                    _ => continue,
+                };
+                *fix_queue_by_category
+                    .entry(stage_key.to_string())
+                    .or_insert(0) += 1;
+            }
         }
 
         ScanSummary {
@@ -97,6 +112,7 @@ impl OutputWriter {
             by_complexity,
             scanners_run,
             scan_duration_ms,
+            fix_queue_by_category,
         }
     }
 
@@ -148,6 +164,7 @@ mod tests {
                 success_condition: "no findings".to_string(),
             },
             priority_score: score,
+            priority_tier: "medium".to_string(),
             cross_file: false,
         }
     }

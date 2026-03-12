@@ -15,8 +15,11 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 
 use super::{
-    evidence::extract_evidence_block, fix_meta::FixMetadata, priority::wsjf_score,
-    verification::VerificationInfo, Issue,
+    evidence::extract_evidence_block,
+    fix_meta::FixMetadata,
+    priority::{priority_level, wsjf_score, PriorityLevel},
+    verification::VerificationInfo,
+    Issue,
 };
 use crate::scanner::parser::RawFinding;
 
@@ -64,6 +67,14 @@ impl IssueBuilder {
             false, // cross_file: determined by caller for multi-file issues
         );
 
+        let priority_tier = match priority_level(score) {
+            PriorityLevel::Critical => "critical",
+            PriorityLevel::High => "high",
+            PriorityLevel::Medium => "medium",
+            PriorityLevel::Low => "low",
+        }
+        .to_string();
+
         let id = fingerprint(
             &finding.rule_id,
             &finding.file_path,
@@ -86,6 +97,7 @@ impl IssueBuilder {
             fix,
             verification,
             priority_score: score,
+            priority_tier,
             cross_file: false,
         }
     }

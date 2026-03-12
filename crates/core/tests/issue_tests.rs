@@ -124,6 +124,7 @@ mod issue_tests {
                 success_condition: "no findings".to_string(),
             },
             priority_score: score,
+            priority_tier: "medium".to_string(),
             cross_file: false,
         };
 
@@ -197,6 +198,11 @@ mod issue_tests {
                 success_condition: "no findings".to_string(),
             },
             priority_score: if auto_fixable { 60 } else { 20 },
+            priority_tier: if auto_fixable {
+                "high".to_string()
+            } else {
+                "medium".to_string()
+            },
             cross_file: false,
         }
     }
@@ -390,6 +396,7 @@ mod issue_tests {
             ]),
             scanners_run: vec!["semgrep".to_string(), "trivy".to_string()],
             scan_duration_ms: 1234,
+            fix_queue_by_category: HashMap::from([("linters".to_string(), 3usize)]),
         };
 
         assert_eq!(summary.total_issues, 10);
