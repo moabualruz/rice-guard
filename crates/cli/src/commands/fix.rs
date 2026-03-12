@@ -9,7 +9,7 @@
 /// - `0` — dry-run completed, or no fixes applied and all tools clean.
 /// - `1` — fix completed; some issues remain (partially fixed or skipped).
 /// - `2` — tool error: config missing/invalid, infra failure, or `--unsafe`
-///          without `--yes` in a non-TTY environment.
+///   without `--yes` in a non-TTY environment.
 use std::time::Instant;
 
 use rice_guard_core::fixer::engine::FixerEngineConfig;

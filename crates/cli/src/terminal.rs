@@ -388,14 +388,12 @@ pub fn print_fix_summary_table(report: &FixReport) {
             } else {
                 "FAIL".to_string()
             }
+        } else if tty {
+            "\u{2713}"
+                .if_supports_color(Stream::Stdout, |t| t.green())
+                .to_string()
         } else {
-            if tty {
-                "\u{2713}"
-                    .if_supports_color(Stream::Stdout, |t| t.green())
-                    .to_string()
-            } else {
-                "ok".to_string()
-            }
+            "ok".to_string()
         };
 
         println!(

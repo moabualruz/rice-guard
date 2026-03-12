@@ -280,8 +280,15 @@ fn fix_dry_run_writes_report() {
         .assert()
         .code(0);
 
-    let latest = dir.path().join("reports").join("latest").join("fix-report.json");
-    assert!(latest.exists(), "fix-report.json must exist at reports/latest/");
+    let latest = dir
+        .path()
+        .join("reports")
+        .join("latest")
+        .join("fix-report.json");
+    assert!(
+        latest.exists(),
+        "fix-report.json must exist at reports/latest/"
+    );
 
     let content = std::fs::read_to_string(&latest).expect("failed to read fix-report.json");
     let parsed: serde_json::Value =
@@ -325,7 +332,12 @@ fn fix_formatters_stage_filter() {
     let dir = tempfile::tempdir().unwrap();
     write_minimal_config(dir.path());
     rice_guard()
-        .args(["fix", dir.path().to_str().unwrap(), "--formatters", "--dry-run"])
+        .args([
+            "fix",
+            dir.path().to_str().unwrap(),
+            "--formatters",
+            "--dry-run",
+        ])
         .assert()
         .code(0);
 }

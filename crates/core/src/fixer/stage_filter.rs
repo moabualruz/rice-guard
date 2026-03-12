@@ -1,7 +1,7 @@
-/// Stage filter for the fix pipeline.
-///
-/// Maps CLI flags to the ordered list of pipeline stages that should run.
-/// Stages are always executed in PIPELINE_STAGES order, never reordered.
+//! Stage filter for the fix pipeline.
+//!
+//! Maps CLI flags to the ordered list of pipeline stages that should run.
+//! Stages are always executed in PIPELINE_STAGES order, never reordered.
 
 /// All pipeline stages in execution order.
 ///
