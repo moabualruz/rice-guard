@@ -272,10 +272,9 @@ mod issue_tests {
             std::fs::read(dir.path().join("issues-fixable.json")).expect("read fixable");
         let fixable_val: serde_json::Value =
             serde_json::from_slice(&fixable_bytes).expect("parse fixable");
-        let fixable: Vec<rice_guard_core::issue::Issue> = serde_json::from_value(
-            fixable_val["issues"].clone(),
-        )
-        .expect("parse fixable issues array");
+        let fixable: Vec<rice_guard_core::issue::Issue> =
+            serde_json::from_value(fixable_val["issues"].clone())
+                .expect("parse fixable issues array");
         assert_eq!(fixable.len(), 2, "fixable.json must contain 2 issues");
         assert!(
             fixable.iter().all(|i| i.fix.auto_fixable),
@@ -286,10 +285,9 @@ mod issue_tests {
             std::fs::read(dir.path().join("issues-remaining.json")).expect("read remaining");
         let remaining_val: serde_json::Value =
             serde_json::from_slice(&remaining_bytes).expect("parse remaining");
-        let remaining: Vec<rice_guard_core::issue::Issue> = serde_json::from_value(
-            remaining_val["issues"].clone(),
-        )
-        .expect("parse remaining issues array");
+        let remaining: Vec<rice_guard_core::issue::Issue> =
+            serde_json::from_value(remaining_val["issues"].clone())
+                .expect("parse remaining issues array");
         assert_eq!(remaining.len(), 1, "remaining.json must contain 1 issue");
         assert!(
             remaining.iter().all(|i| !i.fix.auto_fixable),
@@ -382,8 +380,7 @@ mod issue_tests {
         // issues-fixable.json must also have schema_version.
         let fix_bytes =
             std::fs::read(dir.path().join("issues-fixable.json")).expect("read fixable");
-        let fix_val: serde_json::Value =
-            serde_json::from_slice(&fix_bytes).expect("parse fixable");
+        let fix_val: serde_json::Value = serde_json::from_slice(&fix_bytes).expect("parse fixable");
         assert_eq!(
             fix_val["schema_version"].as_str(),
             Some("1.0"),

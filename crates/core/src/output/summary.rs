@@ -138,7 +138,10 @@ mod tests {
         assert!(json.contains("total_issues"));
         assert!(json.contains("fixable_count"));
         assert!(json.contains("scan_duration_ms"));
-        assert!(json.contains("schema_version"), "summary.json must have schema_version");
+        assert!(
+            json.contains("schema_version"),
+            "summary.json must have schema_version"
+        );
     }
 
     #[test]

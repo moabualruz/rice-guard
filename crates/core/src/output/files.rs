@@ -135,8 +135,16 @@ pub(crate) fn write_all_files(
     let normalized = normalize_issues(issues);
 
     // Split into fixable and remaining subsets.
-    let fixable: Vec<Issue> = normalized.iter().filter(|i| i.fix.auto_fixable).cloned().collect();
-    let remaining: Vec<Issue> = normalized.iter().filter(|i| !i.fix.auto_fixable).cloned().collect();
+    let fixable: Vec<Issue> = normalized
+        .iter()
+        .filter(|i| i.fix.auto_fixable)
+        .cloned()
+        .collect();
+    let remaining: Vec<Issue> = normalized
+        .iter()
+        .filter(|i| !i.fix.auto_fixable)
+        .cloned()
+        .collect();
 
     // Wrap each issue list with schema_version for forward compatibility (EVID-09).
     let all_output = IssueOutput {
