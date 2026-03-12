@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
+use rice_guard_core::fixer::FixReport;
 
 /// Returns `true` when stdout is a TTY (interactive terminal).
 ///
@@ -271,5 +272,153 @@ pub fn print_scan_summary_table(
     );
     println!();
     println!("  Output: {}", output_dir_path);
+    println!();
+}
+
+/// Print an unsafe-fixes warning banner to stdout.
+///
+/// Lists all tool names that require `--unsafe` to run. Color-gated on
+/// [`is_tty()`] — plain text fallback when stdout is not a TTY or when
+/// `NO_COLOR` is set.
+///
+/// # Arguments
+///
+/// * `tool_names` — names of the unsafe tools that will run.
+pub fn print_unsafe_warning_banner(tool_names: &[String]) {
+    let tty = is_tty();
+
+    println!();
+    if tty {
+        let warning = "  \u{26a0}  WARNING: Unsafe fixes enabled";
+        let colored = warning
+            .if_supports_color(Stream::Stdout, |t| t.bold())
+            .to_string();
+        println!("{colored}");
+    } else {
+        println!("  [WARNING] Unsafe fixes enabled");
+    }
+    println!();
+    for name in tool_names {
+        println!("    - {name}");
+    }
+    println!();
+}
+
+/// Print the post-fix summary table to stdout.
+///
+/// Displays a stage-level table: stage name, tools run, files fixed, and
+/// status. Color-gated on [`is_tty()`] — plain text fallback when stdout
+/// is not a TTY or when `NO_COLOR` is set.
+///
+/// # Arguments
+///
+/// * `report` — the completed (or partial) [`FixReport`].
+pub fn print_fix_summary_table(report: &FixReport) {
+    use rice_guard_core::fixer::FixToolStatus;
+
+    let tty = is_tty();
+
+    // Header line
+    let dry_label = if report.dry_run { " (dry-run)" } else { "" };
+    if tty {
+        println!(
+            "\n{}: {} stage(s)\n",
+            format!("Fix pipeline{dry_label}").bold(),
+            report.stages.len()
+        );
+    } else {
+        println!("\nFix pipeline{dry_label}: {} stage(s)\n", report.stages.len());
+    }
+
+    // Column header
+    let header = format!(
+        "  {:<14} {:<12} {:<14} {}",
+        "Stage", "Tools Run", "Files Fixed", "Status"
+    );
+    println!(
+        "{}",
+        if tty {
+            header
+                .if_supports_color(Stream::Stdout, |t| t.dimmed())
+                .to_string()
+        } else {
+            header
+        }
+    );
+    println!("  {}", "\u{2500}".repeat(55));
+
+    let mut total_tools = 0usize;
+    let mut total_modified = 0usize;
+
+    // Use pipeline stage order (same as PIPELINE_STAGES)
+    let stage_order = ["format", "lint", "security", "ast", "deps", "import"];
+    for stage_name in &stage_order {
+        let stage_result = match report.stages.get(*stage_name) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tools_run = stage_result.tools.len();
+        if tools_run == 0 && stage_result.status == "skipped" {
+            continue;
+        }
+
+        total_tools += tools_run;
+
+        let files_fixed: usize = stage_result
+            .tools
+            .iter()
+            .map(|t| t.modified_files.len())
+            .sum();
+        total_modified += files_fixed;
+
+        let has_failure = stage_result
+            .tools
+            .iter()
+            .any(|t| matches!(t.status, FixToolStatus::Failed));
+
+        let status_str = if has_failure {
+            if tty {
+                "\u{2717}"
+                    .if_supports_color(Stream::Stdout, |t| t.red())
+                    .to_string()
+            } else {
+                "FAIL".to_string()
+            }
+        } else {
+            if tty {
+                "\u{2713}"
+                    .if_supports_color(Stream::Stdout, |t| t.green())
+                    .to_string()
+            } else {
+                "ok".to_string()
+            }
+        };
+
+        println!(
+            "  {:<14} {:<12} {:<14} {}",
+            stage_name, tools_run, files_fixed, status_str
+        );
+    }
+
+    // Totals row
+    println!("  {}", "\u{2500}".repeat(55));
+    let total_label = if tty {
+        "Total".bold().to_string()
+    } else {
+        "Total".to_string()
+    };
+    println!(
+        "  {:<14} {:<12} {:<14}",
+        total_label, total_tools, total_modified
+    );
+    println!();
+    println!(
+        "  Fixed: {}  Attempted: {}  Skipped: {}  Failed: {}",
+        report.summary.total_fixed,
+        report.summary.total_attempted,
+        report.summary.total_skipped,
+        report.summary.total_failed
+    );
     println!();
 }
