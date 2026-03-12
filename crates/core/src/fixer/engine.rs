@@ -32,7 +32,6 @@ impl FixerEngine {
 #[cfg(test)]
 mod tests {
     #[test]
-    #[ignore = "RED stub — will turn GREEN in Plan 02"]
     fn pipeline_stages_in_order() {
         use crate::fixer::stage_filter::PIPELINE_STAGES;
         assert_eq!(PIPELINE_STAGES[0], "format");
@@ -42,7 +41,6 @@ mod tests {
         assert_eq!(PIPELINE_STAGES[4], "deps");
         assert_eq!(PIPELINE_STAGES[5], "import");
         assert_eq!(PIPELINE_STAGES.len(), 6);
-        todo!("RED stub — verify PIPELINE_STAGES constant ordering");
     }
 
     #[test]

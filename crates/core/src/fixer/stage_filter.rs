@@ -72,7 +72,28 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "RED stub — will turn GREEN in Plan 02"]
+    fn pipeline_stages_in_order() {
+        assert_eq!(PIPELINE_STAGES[0], "format");
+        assert_eq!(PIPELINE_STAGES[1], "lint");
+        assert_eq!(PIPELINE_STAGES[2], "security");
+        assert_eq!(PIPELINE_STAGES[3], "ast");
+        assert_eq!(PIPELINE_STAGES[4], "deps");
+        assert_eq!(PIPELINE_STAGES[5], "import");
+        assert_eq!(PIPELINE_STAGES.len(), 6);
+    }
+
+    #[test]
+    fn no_flags_runs_all() {
+        let filter = StageFilter::from_args(false, false, false, false, false, false);
+        assert!(filter.includes("format"), "format should run with no flags");
+        assert!(
+            filter.includes("security"),
+            "security should run with no flags"
+        );
+        assert!(filter.includes("import"), "import should run with no flags");
+    }
+
+    #[test]
     fn formatters_flag_selects_format() {
         let filter = StageFilter::from_args(true, false, false, false, false, false);
         assert!(filter.includes("format"), "format stage should be included");
@@ -80,11 +101,9 @@ mod tests {
             !filter.includes("lint"),
             "lint stage should NOT be included"
         );
-        todo!("RED stub — will be verified when implementation is complete");
     }
 
     #[test]
-    #[ignore = "RED stub — will turn GREEN in Plan 02"]
     fn combined_flags_run_both() {
         let filter = StageFilter::from_args(true, true, false, false, false, false);
         assert!(filter.includes("format"), "format should be included");
@@ -93,6 +112,5 @@ mod tests {
             !filter.includes("security"),
             "security should NOT be included"
         );
-        todo!("RED stub — will be verified when implementation is complete");
     }
 }
