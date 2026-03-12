@@ -1,0 +1,36 @@
+# SonarQube CE + PostgreSQL for rice-guard integration.
+# Linux prerequisite: sudo sysctl -w vm.max_map_count=524288
+# Usage: docker compose up -d
+# UI: http://localhost:${SONARQUBE_PORT:-9000} (default admin/admin, change on first login)
+services:
+  sonarqube:
+    image: sonarqube:community
+    depends_on:
+      - db
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${POSTGRES_PASSWORD:-sonar}
+    ports:
+      - "${SONARQUBE_PORT:-9000}:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    restart: unless-stopped
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sonar}
+      POSTGRES_DB: sonarqube
+    volumes:
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
+    restart: unless-stopped
+volumes:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  postgresql:
+  postgresql_data:
