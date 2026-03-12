@@ -54,6 +54,8 @@ pub enum ScannerStatus {
     /// Scanner ran but encountered an error.
     Failed,
     /// Scanner was not in the selected mode subset or was unavailable.
+    // Constructed by callers that have richer scanner metadata (future use).
+    #[allow(dead_code)]
     Skipped,
 }
 
@@ -100,6 +102,8 @@ impl ScanProgressReporter {
     }
 
     /// Finish a scanner's spinner with a completion message.
+    // Used by callers with per-scanner completion callbacks (future use).
+    #[allow(dead_code)]
     pub fn finish_scanner(&self, name: &str, msg: &str) {
         if let Some(pb) = self.bars.get(name) {
             pb.finish_with_message(msg.to_string());
@@ -203,21 +207,19 @@ pub fn print_scan_summary_table(
 
         // Severity breakdown: "5H 12M 3L 2I" (color-coded in TTY)
         let sev = if tty {
-            format!(
-                "{} {} {} {}",
-                format!("{}H", r.high)
-                    .if_supports_color(Stream::Stdout, |t| t.red())
-                    .to_string(),
-                format!("{}M", r.medium)
-                    .if_supports_color(Stream::Stdout, |t| t.yellow())
-                    .to_string(),
-                format!("{}L", r.low)
-                    .if_supports_color(Stream::Stdout, |t| t.blue())
-                    .to_string(),
-                format!("{}I", r.info)
-                    .if_supports_color(Stream::Stdout, |t| t.dimmed())
-                    .to_string(),
-            )
+            let h = format!("{}H", r.high)
+                .if_supports_color(Stream::Stdout, |t| t.red())
+                .to_string();
+            let m = format!("{}M", r.medium)
+                .if_supports_color(Stream::Stdout, |t| t.yellow())
+                .to_string();
+            let l = format!("{}L", r.low)
+                .if_supports_color(Stream::Stdout, |t| t.blue())
+                .to_string();
+            let i = format!("{}I", r.info)
+                .if_supports_color(Stream::Stdout, |t| t.dimmed())
+                .to_string();
+            format!("{h} {m} {l} {i}")
         } else {
             format!("{}H {}M {}L {}I", r.high, r.medium, r.low, r.info)
         };
@@ -238,21 +240,19 @@ pub fn print_scan_summary_table(
     // Totals row
     println!("  {}", "\u{2500}".repeat(70));
     let total_sev = if tty {
-        format!(
-            "{} {} {} {}",
-            format!("{}H", total_high)
-                .if_supports_color(Stream::Stdout, |t| t.red())
-                .to_string(),
-            format!("{}M", total_medium)
-                .if_supports_color(Stream::Stdout, |t| t.yellow())
-                .to_string(),
-            format!("{}L", total_low)
-                .if_supports_color(Stream::Stdout, |t| t.blue())
-                .to_string(),
-            format!("{}I", total_info)
-                .if_supports_color(Stream::Stdout, |t| t.dimmed())
-                .to_string(),
-        )
+        let h = format!("{}H", total_high)
+            .if_supports_color(Stream::Stdout, |t| t.red())
+            .to_string();
+        let m = format!("{}M", total_medium)
+            .if_supports_color(Stream::Stdout, |t| t.yellow())
+            .to_string();
+        let l = format!("{}L", total_low)
+            .if_supports_color(Stream::Stdout, |t| t.blue())
+            .to_string();
+        let i = format!("{}I", total_info)
+            .if_supports_color(Stream::Stdout, |t| t.dimmed())
+            .to_string();
+        format!("{h} {m} {l} {i}")
     } else {
         format!(
             "{}H {}M {}L {}I",

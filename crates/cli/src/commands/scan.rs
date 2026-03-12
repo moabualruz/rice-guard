@@ -1,20 +1,19 @@
-/// Scan subcommand handler — full implementation (Phase 2, Plan 04 / Phase 3, Plan 04).
-use std::collections::HashMap;
+/// Scan subcommand handler — full implementation (Phase 2, Plan 04-06 / Phase 3, Plan 04).
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
-
-use indicatif::{ProgressBar, ProgressStyle};
-use owo_colors::OwoColorize;
-use owo_colors::Stream;
 
 use crate::args::ScanArgs;
 use crate::output;
+use crate::terminal::{
+    print_scan_summary_table, ScanProgressReporter, ScannerResult, ScannerStatus,
+};
 
 /// Run the scan subcommand.
 ///
 /// Exit codes:
 /// - `0` — scan completed, no findings.
 /// - `1` — scan completed, findings found.
-/// - `2` — tool error (config missing/invalid, infrastructure failure).
+/// - `2` — tool error (config missing/invalid, infrastructure failure) OR all scanners failed.
 pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     // ── Step 1: resolve target path ───────────────────────────────────────────
     let target = args
@@ -60,45 +59,95 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
             }
         };
 
-    // ── Step 5: determine scan mode ───────────────────────────────────────────
-    let mode = if args.quick {
+    // ── Step 5: determine scan mode (composable flags) ────────────────────────
+    // --quick and --security select the scanner subset.
+    // --diff-only is orthogonal: it filters findings to git-changed files only.
+    // Flags stack: --quick --diff-only runs quick scanners AND applies diff filter.
+    let scanner_subset = if args.quick {
         rice_guard_core::scanner::ScanMode::Quick
     } else if args.security {
         rice_guard_core::scanner::ScanMode::Security
-    } else if args.diff_only {
-        rice_guard_core::scanner::ScanMode::DiffOnly
     } else {
         rice_guard_core::scanner::ScanMode::Full
     };
 
-    let enabled_count = config.tools.scanners.values().filter(|&&v| v).count();
+    let apply_diff_filter = args.diff_only;
 
-    // ── Step 6: progress indicator ────────────────────────────────────────────
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.green} {msg}")
-            .unwrap_or_else(|_| ProgressStyle::default_spinner()),
-    );
-    pb.set_message(format!("Scanning with {} scanner(s)...", enabled_count));
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    let mode_label = if args.quick {
+        "Quick scan"
+    } else if args.security {
+        "Security scan"
+    } else {
+        "Full scan"
+    };
+
+    // ── Step 6: collect scanner names for progress reporter ───────────────────
+    // Names of all enabled scanners for the given mode subset.
+    let scanner_names: Vec<String> = descriptors
+        .iter()
+        .filter(|d| config.tools.scanners.get(&d.name).copied().unwrap_or(false))
+        .map(|d| d.name.clone())
+        .collect();
+
+    // ── Step 7: progress indicator ────────────────────────────────────────────
+    let reporter = ScanProgressReporter::new(&scanner_names);
+    for name in &scanner_names {
+        reporter.set_running(name);
+    }
 
     let scan_start = Instant::now();
 
-    // ── Step 7: run scanner engine ────────────────────────────────────────────
+    // ── Step 8: run scanner engine ────────────────────────────────────────────
     let engine = rice_guard_core::scanner::ScannerEngine::new(descriptors, config);
-    let findings = match engine.run(&target, mode, &output_dir).await {
+    let mut findings = match engine.run(&target, scanner_subset, &output_dir).await {
         Ok(f) => f,
         Err(e) => {
-            pb.finish_and_clear();
+            reporter.clear();
             output::print_error(&format!("Scan failed: {e}"));
             return Ok(2);
         }
     };
 
-    pb.set_message("Building AI-ready output...");
+    // ── Step 9: apply diff-only filter (orthogonal to scanner subset) ─────────
+    if apply_diff_filter {
+        match rice_guard_core::scanner::diff_only_filter(&target).await {
+            Ok(changed_files) if !changed_files.is_empty() => {
+                findings.retain(|f| {
+                    changed_files.iter().any(|cf| {
+                        let changed_str = cf.to_string_lossy().replace('\\', "/");
+                        let finding_path = f.file_path.replace('\\', "/");
+                        changed_str.ends_with(&finding_path)
+                            || finding_path.ends_with(
+                                cf.file_name()
+                                    .map(|n| n.to_string_lossy().to_string())
+                                    .unwrap_or_default()
+                                    .as_str(),
+                            )
+                    })
+                });
+            }
+            Ok(_) => {
+                tracing::warn!("diff-only: no changed files found; returning all findings");
+            }
+            Err(e) => {
+                tracing::warn!("diff-only filter failed ({}); returning all findings", e);
+            }
+        }
+    }
 
-    // ── Step 8: Phase 3 pipeline — enrich findings into Issues ───────────────
+    // ── Step 10: detect ALL-scanner-failure ───────────────────────────────────
+    // If all attempted scanners produced zero results, it likely indicates
+    // that no scanner could run (all unavailable or all failed).
+    // This is exit code 2 (tool error), not exit code 1 (findings).
+    let attempted_count = scanner_names.len();
+    let producing_scanners: HashSet<&str> = findings.iter().map(|f| f.scanner.as_str()).collect();
+    let all_failed = attempted_count > 0 && producing_scanners.is_empty();
+
+    if all_failed {
+        output::print_warning("All scanners failed or were unavailable.");
+    }
+
+    // ── Step 11: Phase 3 pipeline — enrich findings into Issues ──────────────
     use rice_guard_core::issue::{
         file_freq_map, sort_issues, EvidenceBlock, EvidenceExtractor, IssueBuilder,
     };
@@ -163,7 +212,7 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
 
     let scan_duration_ms = scan_start.elapsed().as_millis() as u64;
 
-    // ── Step 9: write output files ────────────────────────────────────────────
+    // ── Step 12: write output files ───────────────────────────────────────────
     let scanners_run: Vec<String> = {
         let mut seen = std::collections::HashSet::new();
         findings
@@ -182,32 +231,69 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
 
     let writer = OutputWriter::new(output_dir.path());
     if let Err(e) = writer.write_all(&issues, &summary) {
+        reporter.clear();
         output::print_error(&format!("Failed to write output files: {e}"));
         return Ok(2);
     }
 
-    pb.finish_and_clear();
+    // ── Step 13: create reports/latest symlink ────────────────────────────────
+    // Best-effort — failure is warned but never aborts the scan.
+    if let Err(e) = output_dir.create_latest_symlink(&reports_base) {
+        tracing::warn!("Failed to create reports/latest: {}", e);
+    }
 
-    // ── Step 10: print summary ────────────────────────────────────────────────
-    let count = issues.len();
-    let count_str = if output::supports_color(Stream::Stdout) {
-        if count > 0 {
-            format!("{}", count.if_supports_color(Stream::Stdout, |t| t.red()))
-        } else {
-            format!("{}", count.if_supports_color(Stream::Stdout, |t| t.green()))
-        }
-    } else {
-        count.to_string()
-    };
+    // ── Step 14: build per-scanner results for summary table ──────────────────
+    let scanner_results: Vec<ScannerResult> = scanner_names
+        .iter()
+        .map(|name| {
+            let scanner_issues: Vec<_> = findings.iter().filter(|f| &f.scanner == name).collect();
+            let high = scanner_issues
+                .iter()
+                .filter(|f| f.severity == "error")
+                .count();
+            let medium = scanner_issues
+                .iter()
+                .filter(|f| f.severity == "warning")
+                .count();
+            let low = scanner_issues
+                .iter()
+                .filter(|f| f.severity == "info")
+                .count();
+            // info bucket: anything not classified above
+            let info = scanner_issues.len().saturating_sub(high + medium + low);
+            let status = if producing_scanners.contains(name.as_str()) || scanner_issues.is_empty()
+            {
+                ScannerStatus::Success
+            } else {
+                ScannerStatus::Failed
+            };
+            ScannerResult {
+                name: name.clone(),
+                status,
+                findings: scanner_issues.len(),
+                high,
+                medium,
+                low,
+                info,
+                duration_ms: 0, // engine does not yet return per-scanner timing
+                error_msg: None,
+            }
+        })
+        .collect();
 
-    output::print_info(&format!(
-        "Wrote {} issue(s) to {}",
-        count_str,
-        output_dir.path().display()
-    ));
+    // ── Step 15: clear bars and print summary table ───────────────────────────
+    reporter.clear();
+    print_scan_summary_table(
+        mode_label,
+        &scanner_results,
+        &output_dir.path().to_string_lossy(),
+    );
 
-    // ── Step 11: return exit code ─────────────────────────────────────────────
-    if issues.is_empty() {
+    // ── Step 16: return exit code ─────────────────────────────────────────────
+    // 0 = clean (no findings), 1 = findings, 2 = all scanners failed / infra error
+    if all_failed {
+        Ok(2)
+    } else if issues.is_empty() {
         Ok(0)
     } else {
         Ok(1)
