@@ -96,12 +96,14 @@ fn scan_missing_config_exits_two() {
 }
 
 #[test]
-fn fix_not_implemented_exits_zero() {
+fn fix_no_config_exits_two() {
+    // Running `fix` without a .riceguard.yaml exits 2 with a helpful message.
+    // Uses the crate root (no config) as the target directory.
     rice_guard()
         .args(["fix", "."])
         .assert()
-        .success()
-        .stderr(predicate::str::contains("not yet implemented"));
+        .failure()
+        .stderr(predicate::str::contains("No .riceguard.yaml"));
 }
 
 #[test]
