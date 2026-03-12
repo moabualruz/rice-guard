@@ -57,6 +57,17 @@ assert_cmd = "2.2"
 predicates = "3.1"
 insta = { version = "1.46", features = ["yaml"] }
 
+# HTTP server
+axum = { version = "0.8", features = ["json"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "timeout"] }
+http-body-util = "0.1"
+
+# MCP server
+rmcp = { version = "1.2", features = ["server", "transport-io", "macros"] }
+
+# Schema generation
+schemars = "0.8"
+
 # Workspace crates
 rice-guard-core = { path = "crates/core" }
 rice-guard-server = { path = "crates/server" }
