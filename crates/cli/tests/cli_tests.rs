@@ -143,12 +143,14 @@ fn status_not_implemented_exits_zero() {
 }
 
 #[test]
-fn serve_not_implemented_exits_zero() {
+fn serve_help_exits_zero() {
+    // `serve` is fully implemented (Phase 5) — it starts the REST API server.
+    // Running without --help would block, so we test help output instead.
     rice_guard()
-        .args(["serve"])
+        .args(["serve", "--help"])
         .assert()
         .success()
-        .stderr(predicate::str::contains("not yet implemented"));
+        .stdout(predicate::str::contains("serve"));
 }
 
 #[test]
