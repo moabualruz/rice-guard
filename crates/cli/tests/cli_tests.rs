@@ -183,6 +183,19 @@ fn fix_help_shows_flags() {
 }
 
 #[test]
+fn fix_help_shows_new_flags() {
+    rice_guard()
+        .args(["fix", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--imports"))
+        .stdout(predicate::str::contains("--diff"))
+        .stdout(predicate::str::contains("--rescan"))
+        .stdout(predicate::str::contains("--timeout"))
+        .stdout(predicate::str::contains("--yes"));
+}
+
+#[test]
 fn serve_help_shows_port_flag() {
     rice_guard()
         .args(["serve", "--help"])

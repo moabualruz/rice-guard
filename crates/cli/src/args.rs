@@ -134,6 +134,30 @@ pub struct FixArgs {
     /// Fix issues from a JSON file (output of `scan`).
     #[arg(long, value_name = "FILE")]
     pub issues: Option<PathBuf>,
+
+    /// Run import cleanup fixers (ruff F401/I, goimports, dart fix, etc.).
+    #[arg(long)]
+    pub imports: bool,
+
+    /// Include file diffs in fix-report.json (off by default; expensive for large projects).
+    #[arg(long)]
+    pub diff: bool,
+
+    /// Re-run check commands after all stages and write issues-remaining.json.
+    #[arg(long)]
+    pub rescan: bool,
+
+    /// Global pipeline timeout in seconds (default: 600).
+    #[arg(long, default_value = "600")]
+    pub timeout: u64,
+
+    /// Skip the --unsafe confirmation prompt (for CI pipelines; use with --unsafe).
+    #[arg(long)]
+    pub yes: bool,
+
+    /// Additional file targets (when given, only these files are fixed instead of entire project).
+    #[arg(trailing_var_arg = true)]
+    pub files: Vec<std::path::PathBuf>,
 }
 
 /// Show current issue counts and trends for the project.
