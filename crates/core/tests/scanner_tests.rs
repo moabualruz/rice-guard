@@ -214,6 +214,24 @@ fn fixture_jscpd_sample_json_has_duplicates() {
     assert!(dup["fragment"].is_string(), "must have fragment");
 }
 
+/// SCAN-06 -- OutputDir::create_latest_symlink creates a stable `latest` path.
+#[test]
+fn output_dir_creates_latest_symlink() {
+    use tempfile::TempDir;
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path().to_string_lossy().to_string();
+    let od = rice_guard_core::scanner::OutputDir::new("myproject", &base).unwrap();
+    // Should not error even when called twice (idempotent replacement).
+    od.create_latest_symlink(&base).unwrap();
+    od.create_latest_symlink(&base).unwrap();
+    // Assert that `latest` resolves to a valid directory.
+    let latest = tmp.path().join("latest");
+    assert!(
+        latest.exists(),
+        "reports/latest should exist after create_latest_symlink"
+    );
+}
+
 // -- Ignored stubs: SCAN-01, SCAN-03, SCAN-04, SCAN-05, SCAN-06 (engine) -----
 
 /// SCAN-01 -- All enabled scanners run: with no scanners enabled, engine returns empty vec.
