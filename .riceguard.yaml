@@ -1,0 +1,65 @@
+version: "1"
+project:
+  name: rice-guard
+  languages:
+    - rust
+  topology: cli
+  architecture: clean
+
+scanners:
+  semgrep:
+    enabled: true
+    rulesets:
+      - p/default
+      - p/rust
+  trivy:
+    enabled: true
+    scanners:
+      - vuln
+      - secret
+  gitleaks:
+    enabled: true
+  jscpd:
+    enabled: true
+    threshold: 5
+  scc:
+    enabled: true
+  sonarqube:
+    enabled: false
+    host: ""
+
+fixers:
+  formatters: true
+  linters: true
+  security: true
+  ast: true
+  deps: true
+  unsafe: false
+
+filters:
+  include: []
+  exclude:
+    - .planning/
+    - .ai/
+    - .branding/
+    - target/
+    - node_modules/
+    - .git/
+    - "*.generated.*"
+    - dist/
+    - npm/
+
+output:
+  format: json
+  severity_threshold: warning
+  include_evidence: true
+
+hooks:
+  pre-commit:
+    enabled: false
+    manager: ""
+    checks: []
+
+ci:
+  provider: github
+  diff_only: false
