@@ -1,1 +1,2 @@
-// Phase 1 stub
+pub mod mcp;
+pub mod rest;
