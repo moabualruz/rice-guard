@@ -371,6 +371,80 @@ mod issue_tests {
         );
     }
 
+    // ── EVID-08: priority_tier field ─────────────────────────────────────────
+
+    /// EVID-08 — IssueBuilder::build_with_evidence() populates priority_tier
+    /// with a non-empty string matching one of the four tier labels.
+    #[test]
+    fn priority_tier_present() {
+        use rice_guard_core::issue::IssueBuilder;
+        use rice_guard_core::scanner::parser::RawFinding;
+        use std::path::Path;
+
+        let finding = RawFinding {
+            scanner: "semgrep".to_string(),
+            rule_id: "test-rule".to_string(),
+            severity: "error".to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 1,
+            message: "test".to_string(),
+            matched_code: None,
+            suggested_replacement: None,
+        };
+        let issue = IssueBuilder::build(&finding, Path::new("."), 5);
+        let valid_tiers = ["critical", "high", "medium", "low"];
+        assert!(
+            valid_tiers.contains(&issue.priority_tier.as_str()),
+            "priority_tier must be one of {:?}, got {:?}",
+            valid_tiers,
+            issue.priority_tier,
+        );
+        assert!(
+            !issue.priority_tier.is_empty(),
+            "priority_tier must not be empty"
+        );
+    }
+
+    // ── EVID-10: fix_queue_by_category in summary ─────────────────────────────
+
+    /// EVID-10 — ScanSummary::from_issues() populates fix_queue_by_category
+    /// with correct stage keys when issues have auto_fix_category set.
+    #[test]
+    fn summary_json_has_fix_queue_by_category() {
+        use rice_guard_core::output::ScanSummary;
+        use std::collections::HashMap;
+
+        // Build issues with known categories.
+        let issues = vec![
+            make_test_issue("fix-a", true, "src/a.rs"),
+            make_test_issue("fix-b", true, "src/b.rs"),
+            make_test_issue("rem-1", false, "src/c.rs"),
+        ];
+        // make_test_issue sets auto_fix_category = "linter" for auto_fixable issues.
+        let summary = ScanSummary::from_issues(&issues, vec![], "/project", 100);
+
+        // fix_queue_by_category must be a HashMap (compile-time + runtime check).
+        let _: &HashMap<String, usize> = &summary.fix_queue_by_category;
+
+        // Two auto_fixable issues with category "linter" -> stage "linters".
+        assert_eq!(
+            summary
+                .fix_queue_by_category
+                .get("linters")
+                .copied()
+                .unwrap_or(0),
+            2,
+            "fix_queue_by_category['linters'] must be 2"
+        );
+
+        // Non-fixable issue must not appear.
+        let total: usize = summary.fix_queue_by_category.values().sum();
+        assert_eq!(
+            total, 2,
+            "only auto_fixable issues counted in fix_queue_by_category"
+        );
+    }
+
     // ── Compile-time: ScanSummary struct has required fields ─────────────────
 
     /// Verify ScanSummary has all required Phase 3 fields (compile-time check).
