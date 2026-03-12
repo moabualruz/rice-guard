@@ -10,6 +10,7 @@
 mod args;
 mod commands;
 mod output;
+mod terminal;
 
 use args::{Cli, Commands};
 use clap::Parser;
