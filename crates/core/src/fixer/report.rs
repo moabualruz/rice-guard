@@ -102,6 +102,56 @@ impl FixReport {
         }
     }
 
+    /// Record a tool result for a given stage, updating summary counters.
+    pub fn record_tool(&mut self, stage: &str, tool_result: FixToolResult) {
+        let stage_entry = self
+            .stages
+            .entry(stage.to_string())
+            .or_insert_with(|| FixStageResult {
+                status: "running".to_string(),
+                tools: vec![],
+            });
+        match &tool_result.status {
+            FixToolStatus::Fixed => self.summary.total_fixed += 1,
+            FixToolStatus::Attempted => self.summary.total_attempted += 1,
+            FixToolStatus::Skipped => self.summary.total_skipped += 1,
+            FixToolStatus::Failed => self.summary.total_failed += 1,
+            FixToolStatus::NoIssues | FixToolStatus::DryRunWouldFix => {
+                self.summary.total_no_issues += 1
+            }
+        }
+        stage_entry.tools.push(tool_result);
+    }
+
+    /// Record a skipped stage (stage was filtered out or no tools available).
+    pub fn record_skipped(&mut self, stage: &str) {
+        self.stages.insert(
+            stage.to_string(),
+            FixStageResult {
+                status: "skipped".to_string(),
+                tools: vec![],
+            },
+        );
+    }
+
+    /// Record a failed stage (stage could not run due to an error).
+    pub fn record_failed(&mut self, stage: &str) {
+        self.stages.insert(
+            stage.to_string(),
+            FixStageResult {
+                status: "failed".to_string(),
+                tools: vec![],
+            },
+        );
+    }
+
+    /// Mark a stage as completed.
+    pub fn finish_stage(&mut self, stage: &str) {
+        if let Some(entry) = self.stages.get_mut(stage) {
+            entry.status = "completed".to_string();
+        }
+    }
+
     /// Serialize the report and write it to both the archive and latest directories.
     ///
     /// This is called after each stage completes so the report accurately
@@ -111,11 +161,14 @@ impl FixReport {
         output_dir: &std::path::Path,
         latest_dir: &std::path::Path,
     ) -> anyhow::Result<()> {
+        use anyhow::Context as _;
         let json = serde_json::to_string_pretty(self)?;
         let archive_path = output_dir.join("fix-report.json");
         let latest_path = latest_dir.join("fix-report.json");
-        std::fs::write(&archive_path, &json)?;
-        std::fs::write(&latest_path, &json)?;
+        std::fs::write(&archive_path, &json)
+            .with_context(|| format!("failed to write fix-report.json to {archive_path:?}"))?;
+        std::fs::write(&latest_path, &json)
+            .with_context(|| format!("failed to write fix-report.json to {latest_path:?}"))?;
         Ok(())
     }
 }
@@ -125,9 +178,46 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "RED stub — will turn GREEN in Plan 03"]
-    fn checkpoint_writes_after_each_stage() {
-        let _report = FixReport::new("test-project".to_string(), false);
-        todo!("RED stub — verify write_checkpoint produces valid JSON in both paths");
+    fn checkpoint_writes_after_each_stage() -> anyhow::Result<()> {
+        use tempfile::tempdir;
+        let out = tempdir()?;
+        let latest = tempdir()?;
+        let report = FixReport::new("test-project".to_string(), false);
+        report.write_checkpoint(out.path(), latest.path())?;
+        assert!(out.path().join("fix-report.json").exists());
+        assert!(latest.path().join("fix-report.json").exists());
+        let content = std::fs::read_to_string(out.path().join("fix-report.json"))?;
+        let parsed: serde_json::Value = serde_json::from_str(&content)?;
+        assert_eq!(parsed["schema_version"], "1.0");
+        Ok(())
+    }
+
+    #[test]
+    fn record_tool_updates_summary() {
+        let mut report = FixReport::new("test-project".to_string(), false);
+
+        let fixed = FixToolResult {
+            name: "rustfmt".to_string(),
+            language: "rust".to_string(),
+            status: FixToolStatus::Fixed,
+            modified_files: vec!["src/main.rs".to_string()],
+            duration_ms: 10,
+            error_msg: None,
+        };
+        let attempted = FixToolResult {
+            name: "clippy".to_string(),
+            language: "rust".to_string(),
+            status: FixToolStatus::Attempted,
+            modified_files: vec![],
+            duration_ms: 20,
+            error_msg: None,
+        };
+
+        report.record_tool("format", fixed);
+        report.record_tool("lint", attempted);
+
+        assert_eq!(report.summary.total_fixed, 1);
+        assert_eq!(report.summary.total_attempted, 1);
+        assert_eq!(report.summary.total_skipped, 0);
     }
 }

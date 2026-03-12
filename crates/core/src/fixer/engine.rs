@@ -3,29 +3,31 @@
 /// `FixerEngine` orchestrates the 6-stage fix pipeline, running deterministic
 /// fixers in order: format -> lint -> security -> ast -> deps -> import.
 /// Each stage runs all applicable tools before advancing to the next.
+use crate::config::RiceGuardConfig;
 use crate::fixer::report::FixReport;
+use crate::registry::DescriptorRegistry;
 
 /// Orchestrates the full deterministic fix pipeline.
 ///
 /// Fields are populated during construction and read during `run()`.
-/// All fields are `#[allow(dead_code)]` because the implementation is
-/// in a subsequent plan — the skeleton must compile cleanly.
-#[allow(dead_code)]
+/// `config` and `registry` are `#[allow(dead_code)]` because `run()` is
+/// implemented in Plan 03 — the skeleton must compile cleanly.
 pub struct FixerEngine {
-    /// Project root directory.
-    project_dir: std::path::PathBuf,
-    /// Whether to run in dry-run mode (no files modified).
-    dry_run: bool,
-    /// Whether unsafe fixers are allowed.
-    unsafe_fixes: bool,
-    /// Global pipeline timeout in seconds.
-    timeout_secs: u64,
+    #[allow(dead_code)]
+    config: RiceGuardConfig,
+    #[allow(dead_code)]
+    registry: DescriptorRegistry,
 }
 
 impl FixerEngine {
+    /// Construct a new engine from the project config and descriptor registry.
+    pub fn new(config: RiceGuardConfig, registry: DescriptorRegistry) -> Self {
+        Self { config, registry }
+    }
+
     /// Run the full fix pipeline and return the completed report.
     pub async fn run(&self) -> anyhow::Result<FixReport> {
-        todo!("FixerEngine::run() — implementation in Plan 04")
+        todo!("FixerEngine::run() — implementation in Plan 03")
     }
 }
 
