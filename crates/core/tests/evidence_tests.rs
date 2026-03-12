@@ -247,6 +247,150 @@ mod evidence_tests {
         }
     }
 
+    // ── EVID-02: small function body inclusion (< 15 lines) ──────────────────
+
+    /// When the enclosing function body is < 15 lines, context_before and
+    /// context_after together span the full function body (not just ±5 lines).
+    /// matched_code is unchanged.
+    ///
+    /// python_fixture: process_data spans lines 5-14 (10 lines, < 15).
+    /// Finding at line 6 (near top of function) — standard ±5 window would
+    /// give context_before = [line 1..5] (5 lines), but with small-function
+    /// body logic, context_before = [line 5] (just the function def line),
+    /// and context_after = lines 7-14 (8 lines, up to end of function).
+    /// So context_after.len() must equal 8 (not the standard 5).
+    #[test]
+    fn small_function_body_included() {
+        let extractor = EvidenceExtractor::new();
+        let source = python_fixture();
+        // Finding at line 6 ("        x = 1") which is near top of process_data.
+        // With standard ±5: context_after = lines 7-11 (5 lines).
+        // With small-function body: context_after = lines 7-14 (8 lines, to end of function).
+        let finding = make_finding_with_code("rule", "src/app.py", 6, "x = 1");
+        let findings_refs: Vec<&RawFinding> = vec![&finding];
+        let result = extractor.extract_file("src/app.py", source, &findings_refs);
+        let block = result
+            .get(&("rule".to_string(), 6))
+            .expect("block must exist");
+
+        // matched_code is still the scanner snippet, not the function body.
+        assert_eq!(
+            block.matched_code, "x = 1",
+            "matched_code must remain the scanner snippet"
+        );
+
+        // With small-function body logic: context_after extends to end of function (line 14),
+        // giving 8 lines (lines 7-14), more than the standard ±5 = 5 lines.
+        assert!(
+            block.context_after.len() > 5,
+            "small function: context_after must extend to end of function body (>5 lines), got {}",
+            block.context_after.len()
+        );
+
+        // The last line of context_after should be the last line of the function body.
+        let last_after = block
+            .context_after
+            .last()
+            .expect("context_after must not be empty");
+        assert!(
+            last_after.contains("return result"),
+            "context_after must end at the last line of the function body ('return result'); got: {last_after:?}"
+        );
+    }
+
+    /// For a function with >= 15 lines, context_before and context_after use
+    /// the standard ±5 line window (not the full function body).
+    #[test]
+    fn large_function_uses_window() {
+        let extractor = EvidenceExtractor::new();
+        // Build a Python file with a large function (>= 15 lines).
+        let source = concat!(
+            "import os\n",           // line 1
+            "\n",                    // line 2
+            "def big_function():\n", // line 3
+            "    a = 1\n",           // line 4
+            "    b = 2\n",           // line 5
+            "    c = 3\n",           // line 6
+            "    d = 4\n",           // line 7
+            "    e = 5\n",           // line 8
+            "    f = 6\n",           // line 9
+            "    g = 7\n",           // line 10
+            "    h = 8\n",           // line 11
+            "    i = 9\n",           // line 12
+            "    j = 10\n",          // line 13
+            "    k = 11\n",          // line 14
+            "    l = 12\n",          // line 15
+            "    m = 13\n",          // line 16
+            "    n = 14\n",          // line 17
+            "    o = eval(x)\n",     // line 18  <- finding
+            "    p = 15\n",          // line 19
+            "    q = 16\n",          // line 20
+            "    return a\n",        // line 21
+        );
+        // Function big_function spans lines 3-21 (19 lines, >= 15 threshold).
+        // Finding at line 18 should use ±5 window.
+        let finding = make_finding("rule", "src/big.py", 18);
+        let findings_refs: Vec<&RawFinding> = vec![&finding];
+        let result = extractor.extract_file("src/big.py", source, &findings_refs);
+        let block = result
+            .get(&("rule".to_string(), 18))
+            .expect("block must exist");
+
+        // Standard ±5 window: context_before has 5 lines (lines 13-17),
+        // context_after has 3 lines (lines 19-21).
+        assert_eq!(
+            block.context_before.len(),
+            5,
+            "large function: context_before must be 5 (standard window)"
+        );
+    }
+
+    /// matched_code is the scanner snippet even when small-function body
+    /// replacement is applied to context_before/after.
+    #[test]
+    fn small_function_body_does_not_change_matched_code() {
+        let extractor = EvidenceExtractor::new();
+        let source = python_fixture();
+        let finding = make_finding_with_code("rule", "src/app.py", 10, "eval(user_input)");
+        let findings_refs: Vec<&RawFinding> = vec![&finding];
+        let result = extractor.extract_file("src/app.py", source, &findings_refs);
+        let block = result
+            .get(&("rule".to_string(), 10))
+            .expect("block must exist");
+        assert_eq!(
+            block.matched_code, "eval(user_input)",
+            "matched_code must not be replaced with function body"
+        );
+    }
+
+    /// For unsupported extension (.xyz), EvidenceExtractor falls back to ±5
+    /// line window without crashing (no tree-sitter available).
+    #[test]
+    fn graceful_fallback_no_tree_sitter() {
+        let extractor = EvidenceExtractor::new();
+        let source = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\n";
+        let finding = make_finding("rule", "src/config.xyz", 5);
+        let findings_refs: Vec<&RawFinding> = vec![&finding];
+        let result = extractor.extract_file("src/config.xyz", source, &findings_refs);
+        let block = result
+            .get(&("rule".to_string(), 5))
+            .expect("block must exist for unknown extension");
+        // Falls back to ±5 window: context_before=4 lines (1-4), context_after=5 lines (6-10)
+        assert_eq!(
+            block.context_before.len(),
+            4,
+            "fallback: context_before must be ±5 window"
+        );
+        assert_eq!(
+            block.context_after.len(),
+            5,
+            "fallback: context_after must be ±5 window"
+        );
+        assert!(block.enclosing_function.is_none());
+        assert!(block.enclosing_class.is_none());
+        assert!(block.imports.is_empty());
+    }
+
     // ── Graceful degradation for unsupported extension ───────────────────────
 
     /// If the file has an unsupported extension, EvidenceExtractor should still

@@ -73,6 +73,10 @@ impl EvidenceBlock {
 /// Number of context lines to include above and below the finding line.
 pub const CONTEXT_LINES: usize = 5;
 
+/// When the enclosing function body has fewer than this many lines, the full
+/// function body is used as context instead of the ±`CONTEXT_LINES` window.
+pub const SMALL_FUNCTION_LINES: usize = 15;
+
 // ── Line-number conversion ────────────────────────────────────────────────────
 
 /// Convert a 1-based SARIF line number to a 0-based Vec index.
@@ -211,6 +215,39 @@ fn language_node_kinds(ext: &str) -> Option<LanguageNodeKinds> {
 // ── Tree-sitter AST walking helpers ──────────────────────────────────────────
 
 /// Walk ancestors of the node covering `line` (0-based) looking for any node
+/// whose kind is in `kinds`. Returns the first matching ancestor `Node`, or
+/// `None` if no ancestor of that kind is found.
+///
+/// Used by both [`find_enclosing_by_kinds`] (name extraction) and the
+/// small-function body logic (range extraction) to avoid duplicating the
+/// ancestor-walking loop.
+fn find_enclosing_node_by_kinds<'a>(
+    root: Node<'a>,
+    line: usize,
+    kinds: &[&str],
+) -> Option<Node<'a>> {
+    if kinds.is_empty() {
+        return None;
+    }
+    let point = tree_sitter::Point {
+        row: line,
+        column: 0,
+    };
+    let leaf = root.descendant_for_point_range(point, point)?;
+    let mut cursor = leaf;
+    loop {
+        if kinds.contains(&cursor.kind()) {
+            return Some(cursor);
+        }
+        match cursor.parent() {
+            Some(p) => cursor = p,
+            None => break,
+        }
+    }
+    None
+}
+
+/// Walk ancestors of the node covering `line` (0-based) looking for any node
 /// whose kind is in `kinds`. Returns the text of the first matching ancestor's
 /// identifier child, or `None`.
 fn find_enclosing_by_kinds(
@@ -219,44 +256,25 @@ fn find_enclosing_by_kinds(
     kinds: &[&str],
     source_bytes: &[u8],
 ) -> Option<String> {
-    if kinds.is_empty() {
-        return None;
-    }
-    // Find the deepest node that covers the target line (column=0).
-    let point = tree_sitter::Point {
-        row: line,
-        column: 0,
-    };
-    let leaf = root.descendant_for_point_range(point, point)?;
+    let node = find_enclosing_node_by_kinds(root, line, kinds)?;
 
-    // Walk from leaf up to root looking for a node of the desired kind.
-    let mut cursor = leaf;
-    loop {
-        if kinds.contains(&cursor.kind()) {
-            // Extract the name from an identifier or name child.
-            let mut child_cursor = cursor.walk();
-            for child in cursor.children(&mut child_cursor) {
-                if matches!(child.kind(), "identifier" | "name" | "simple_identifier") {
-                    if let Ok(text) = child.utf8_text(source_bytes) {
-                        if !text.is_empty() {
-                            return Some(text.to_string());
-                        }
-                    }
+    // Extract the name from an identifier or name child.
+    let mut child_cursor = node.walk();
+    for child in node.children(&mut child_cursor) {
+        if matches!(child.kind(), "identifier" | "name" | "simple_identifier") {
+            if let Ok(text) = child.utf8_text(source_bytes) {
+                if !text.is_empty() {
+                    return Some(text.to_string());
                 }
             }
-            // If no named identifier child, return the node text itself (trimmed).
-            if let Ok(text) = cursor.utf8_text(source_bytes) {
-                let snippet: String = text.chars().take(80).collect();
-                let first_line = snippet.lines().next().unwrap_or("").trim().to_string();
-                if !first_line.is_empty() {
-                    return Some(first_line);
-                }
-            }
-            return None;
         }
-        match cursor.parent() {
-            Some(p) => cursor = p,
-            None => break,
+    }
+    // If no named identifier child, return the node text itself (trimmed).
+    if let Ok(text) = node.utf8_text(source_bytes) {
+        let snippet: String = text.chars().take(80).collect();
+        let first_line = snippet.lines().next().unwrap_or("").trim().to_string();
+        if !first_line.is_empty() {
+            return Some(first_line);
         }
     }
     None
@@ -390,7 +408,7 @@ impl EvidenceExtractor {
         let mut result = HashMap::new();
 
         for f in findings {
-            let (matched_code, context_before, context_after) =
+            let (matched_code, mut context_before, mut context_after) =
                 self.extract_line_context(f, source);
 
             let (enclosing_function, enclosing_class, imports) = if let (Some(tree), Some(nk)) =
@@ -398,6 +416,37 @@ impl EvidenceExtractor {
             {
                 let root = tree.root_node();
                 let ts_line = line_to_index(f.line);
+
+                // Attempt to find the enclosing function node for small-function
+                // body inclusion. If the function is < SMALL_FUNCTION_LINES,
+                // replace context_before/after with the full function body.
+                if let Some(func_node) =
+                    find_enclosing_node_by_kinds(root, ts_line, nk.function_kinds)
+                {
+                    let start_row = func_node.start_position().row; // 0-based
+                    let end_row = func_node.end_position().row; // 0-based, inclusive
+                    let body_lines = end_row.saturating_sub(start_row) + 1;
+
+                    if body_lines < SMALL_FUNCTION_LINES {
+                        let all_lines: Vec<&str> = source.lines().collect();
+                        let func_end = end_row.min(all_lines.len().saturating_sub(1));
+                        let finding_row = ts_line; // 0-based index of the finding line
+
+                        // context_before: function body lines before the finding.
+                        let before_end = finding_row.min(func_end + 1);
+                        context_before = all_lines[start_row..before_end]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect();
+
+                        // context_after: function body lines after the finding.
+                        let after_start = (finding_row + 1).min(func_end + 1);
+                        context_after = all_lines[after_start..=func_end]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect();
+                    }
+                }
 
                 let func = find_enclosing_by_kinds(root, ts_line, nk.function_kinds, source_bytes);
                 let class = find_enclosing_by_kinds(root, ts_line, nk.class_kinds, source_bytes);
