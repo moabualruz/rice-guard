@@ -24,8 +24,8 @@ pub struct FixerEngineConfig {
     pub dry_run: bool,
     /// When true, also run tools marked `safe: false`.
     pub include_unsafe: bool,
-    /// Default per-tool timeout in seconds.
-    pub timeout_secs: u64,
+    /// Optional per-tool timeout in seconds. `None` means no timeout.
+    pub timeout_secs: Option<u64>,
     /// Archive directory for this fix run (timestamped).
     pub output_dir: std::path::PathBuf,
     /// Latest symlink directory (reports/latest).
@@ -159,7 +159,7 @@ mod tests {
             stage_filter,
             dry_run: false,
             include_unsafe,
-            timeout_secs: 10,
+            timeout_secs: None,
             output_dir: dir.to_path_buf(),
             latest_dir: dir.to_path_buf(),
             issue_ids: None,

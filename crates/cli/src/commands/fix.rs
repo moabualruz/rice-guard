@@ -25,10 +25,7 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
     let fix_start = Instant::now();
 
     // ── Step 1: resolve project root ─────────────────────────────────────────
-    let project_root = args
-        .path
-        .canonicalize()
-        .unwrap_or_else(|_| args.path.clone());
+    let project_root = crate::paths::safe_canonicalize(&args.path);
 
     // ── Step 2: load config ───────────────────────────────────────────────────
     let config_path = project_root.join(".riceguard.yaml");

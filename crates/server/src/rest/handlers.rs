@@ -157,10 +157,12 @@ pub async fn scan_handler(
 
     // Run the scanner engine.
     let engine = ScannerEngine::new(descriptors, config);
-    let findings = engine
+    let report = engine
         .run(&project_path, mode, &output_dir)
         .await
         .map_err(|e| ApiError::internal(&e.to_string()))?;
+
+    let findings = report.findings;
 
     // Load fixer descriptors for build_batch.
     let fixer_descriptor_infos: Vec<FixerDescriptorInfo> =
@@ -309,7 +311,7 @@ pub async fn fix_handler(
         stage_filter,
         dry_run: req.dry_run.unwrap_or(false),
         include_unsafe: req.unsafe_fixes.unwrap_or(false),
-        timeout_secs: 120,
+        timeout_secs: None,
         output_dir: fix_output_dir.path().to_path_buf(),
         latest_dir,
         issue_ids: req.issue_id.map(|id| vec![id]),

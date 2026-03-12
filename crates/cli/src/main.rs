@@ -10,6 +10,7 @@
 mod args;
 mod commands;
 mod output;
+mod paths;
 mod terminal;
 
 use args::{Cli, Commands};

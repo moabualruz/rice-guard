@@ -1,5 +1,4 @@
 /// Scan subcommand handler — full implementation (Phase 2, Plan 04-06 / Phase 3, Plan 04).
-use std::collections::HashSet;
 use std::time::Instant;
 
 use crate::args::ScanArgs;
@@ -16,10 +15,7 @@ use crate::terminal::{
 /// - `2` — tool error (config missing/invalid, infrastructure failure) OR all scanners failed.
 pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     // ── Step 1: resolve target path ───────────────────────────────────────────
-    let target = args
-        .path
-        .canonicalize()
-        .unwrap_or_else(|_| args.path.clone());
+    let target = crate::paths::safe_canonicalize(&args.path);
 
     // ── Step 2: load config ───────────────────────────────────────────────────
     let config_path = target.join(".riceguard.yaml");
@@ -99,14 +95,18 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
 
     // ── Step 8: run scanner engine ────────────────────────────────────────────
     let engine = rice_guard_core::scanner::ScannerEngine::new(descriptors, config);
-    let mut findings = match engine.run(&target, scanner_subset, &output_dir).await {
-        Ok(f) => f,
+    let scan_report = match engine.run(&target, scanner_subset, &output_dir).await {
+        Ok(r) => r,
         Err(e) => {
             reporter.clear();
             output::print_error(&format!("Scan failed: {e}"));
             return Ok(2);
         }
     };
+
+    let mut findings = scan_report.findings;
+    let succeeded_scanners = scan_report.succeeded;
+    let failed_scanners = scan_report.failed;
 
     // ── Step 9: apply diff-only filter (orthogonal to scanner subset) ─────────
     if apply_diff_filter {
@@ -136,12 +136,8 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     }
 
     // ── Step 10: detect ALL-scanner-failure ───────────────────────────────────
-    // If all attempted scanners produced zero results, it likely indicates
-    // that no scanner could run (all unavailable or all failed).
-    // This is exit code 2 (tool error), not exit code 1 (findings).
     let attempted_count = scanner_names.len();
-    let producing_scanners: HashSet<&str> = findings.iter().map(|f| f.scanner.as_str()).collect();
-    let all_failed = attempted_count > 0 && producing_scanners.is_empty();
+    let all_failed = attempted_count > 0 && succeeded_scanners.is_empty();
 
     if all_failed {
         output::print_warning("All scanners failed or were unavailable.");
@@ -265,12 +261,17 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
                 .count();
             // info bucket: anything not classified above
             let info = scanner_issues.len().saturating_sub(high + medium + low);
-            let status = if producing_scanners.contains(name.as_str()) || scanner_issues.is_empty()
-            {
-                ScannerStatus::Success
+
+            // Determine status from engine outcomes, not from finding counts.
+            let (status, error_msg) = if succeeded_scanners.contains(name) {
+                (ScannerStatus::Success, None)
+            } else if let Some((_, reason)) = failed_scanners.iter().find(|(n, _)| n == name) {
+                (ScannerStatus::Failed, Some(reason.clone()))
             } else {
-                ScannerStatus::Failed
+                // Unavailable (not enabled, not installed)
+                (ScannerStatus::Failed, Some("unavailable".to_string()))
             };
+
             ScannerResult {
                 name: name.clone(),
                 status,
@@ -280,7 +281,7 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
                 low,
                 info,
                 duration_ms: 0, // engine does not yet return per-scanner timing
-                error_msg: None,
+                error_msg,
             }
         })
         .collect();

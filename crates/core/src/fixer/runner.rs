@@ -19,8 +19,8 @@ pub struct RunnerConfig {
     pub file_targets: Vec<PathBuf>,
     /// When true, only check for issues but do not modify files.
     pub dry_run: bool,
-    /// Per-tool timeout in seconds.
-    pub timeout_secs: u64,
+    /// Per-tool timeout in seconds. `None` means no timeout (run until done).
+    pub timeout_secs: Option<u64>,
 }
 
 /// Execute a single fixer tool using the check → (dry-run?) → fix → verify cycle.
@@ -165,15 +165,15 @@ enum CommandOutcome {
     Timeout,
 }
 
-/// Spawn a subprocess and wait for it to finish (with timeout).
+/// Spawn a subprocess and wait for it to finish (with optional timeout).
 ///
 /// Follows the SCAN-07 pattern: stdout is always null to prevent pipe deadlock.
-async fn run_command(args: &[String], cwd: &Path, timeout_secs: u64) -> CommandOutcome {
+async fn run_command(args: &[String], cwd: &Path, timeout_secs: Option<u64>) -> CommandOutcome {
     if args.is_empty() {
         return CommandOutcome::SpawnFailed("empty command".to_string());
     }
 
-    let mut cmd = tokio::process::Command::new(&args[0]);
+    let mut cmd = crate::registry::probe::resolve_command(&args[0]);
     cmd.args(&args[1..])
         .current_dir(cwd)
         .stdout(Stdio::null())
@@ -182,10 +182,17 @@ async fn run_command(args: &[String], cwd: &Path, timeout_secs: u64) -> CommandO
 
     let spawn_fut = async { cmd.status().await };
 
-    match tokio::time::timeout(Duration::from_secs(timeout_secs), spawn_fut).await {
-        Ok(Ok(status)) => CommandOutcome::Exited(status.code().unwrap_or(-1)),
-        Ok(Err(e)) => CommandOutcome::SpawnFailed(e.to_string()),
-        Err(_elapsed) => CommandOutcome::Timeout,
+    if let Some(secs) = timeout_secs {
+        match tokio::time::timeout(Duration::from_secs(secs), spawn_fut).await {
+            Ok(Ok(status)) => CommandOutcome::Exited(status.code().unwrap_or(-1)),
+            Ok(Err(e)) => CommandOutcome::SpawnFailed(e.to_string()),
+            Err(_elapsed) => CommandOutcome::Timeout,
+        }
+    } else {
+        match spawn_fut.await {
+            Ok(status) => CommandOutcome::Exited(status.code().unwrap_or(-1)),
+            Err(e) => CommandOutcome::SpawnFailed(e.to_string()),
+        }
     }
 }
 
@@ -314,7 +321,7 @@ mod tests {
             project_root: dir.path().to_path_buf(),
             file_targets: vec![],
             dry_run: false,
-            timeout_secs: 30,
+            timeout_secs: None,
         };
 
         let result = run_one_fixer(&step, &cfg).await;
@@ -339,7 +346,7 @@ mod tests {
             project_root: dir.path().to_path_buf(),
             file_targets: vec![],
             dry_run: true,
-            timeout_secs: 30,
+            timeout_secs: None,
         };
 
         let result = run_one_fixer(&step, &cfg).await;
@@ -366,7 +373,7 @@ mod tests {
             project_root: dir.path().to_path_buf(),
             file_targets: vec![],
             dry_run: false,
-            timeout_secs: 10,
+            timeout_secs: None,
         };
 
         let result = run_one_fixer(&step, &cfg).await;
@@ -411,7 +418,7 @@ mod tests {
             project_root: dir.path().to_path_buf(),
             file_targets: vec![target_file.clone()],
             dry_run: false,
-            timeout_secs: 30,
+            timeout_secs: None,
         };
 
         let result = run_one_fixer(&step, &cfg).await;

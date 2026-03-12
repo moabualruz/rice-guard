@@ -148,9 +148,9 @@ pub struct FixArgs {
     #[arg(long)]
     pub rescan: bool,
 
-    /// Global pipeline timeout in seconds (default: 600).
-    #[arg(long, default_value = "600")]
-    pub timeout: u64,
+    /// Per-tool timeout in seconds. Omit for no timeout (tools run until done).
+    #[arg(long)]
+    pub timeout: Option<u64>,
 
     /// Skip the --unsafe confirmation prompt (for CI pipelines; use with --unsafe).
     #[arg(long)]

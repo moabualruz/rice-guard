@@ -17,7 +17,7 @@ pub struct SccLanguage {
     pub name: String,
 
     /// Number of source files in this language.
-    #[serde(rename = "Files")]
+    #[serde(rename = "Count")]
     pub files: u64,
 
     /// Total lines (code + comment + blank).
@@ -211,9 +211,12 @@ mod tests {
                 "Blank": 50,
                 "Complexity": 10,
                 "Count": 12,
-                "Files": 12,
-                "WeightedComplexity": 10.0,
-                "Bytes": 8192
+                "Files": [],
+                "WeightedComplexity": 0,
+                "Bytes": 8192,
+                "CodeBytes": 0,
+                "LineLength": null,
+                "ULOC": 0
             },
             {
                 "Name": "Markdown",
@@ -223,9 +226,12 @@ mod tests {
                 "Blank": 100,
                 "Complexity": 0,
                 "Count": 3,
-                "Files": 3,
-                "WeightedComplexity": 0.0,
-                "Bytes": 1024
+                "Files": [],
+                "WeightedComplexity": 0,
+                "Bytes": 1024,
+                "CodeBytes": 0,
+                "LineLength": null,
+                "ULOC": 0
             }
         ]"#;
 

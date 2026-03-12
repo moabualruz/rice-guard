@@ -245,13 +245,13 @@ async fn scan_01_no_enabled_scanners_returns_empty_vec() {
 
     // RiceGuardConfig::default() has no scanners enabled in tools.scanners.
     let engine = ScannerEngine::new(vec![], RiceGuardConfig::default());
-    let findings = engine
+    let report = engine
         .run(base.path(), ScanMode::Full, &output_dir)
         .await
         .expect("run should succeed even with no scanners");
 
     assert!(
-        findings.is_empty(),
+        report.findings.is_empty(),
         "no scanners configured => empty findings vec"
     );
 }
@@ -307,7 +307,10 @@ async fn scan_03_quick_mode_selects_correct_subset() {
         .expect("Quick mode run must not error");
 
     // All unavailable (disabled in default config) => empty findings
-    assert!(result.is_empty(), "no enabled scanners => empty findings");
+    assert!(
+        result.findings.is_empty(),
+        "no enabled scanners => empty findings"
+    );
 }
 
 /// SCAN-04 -- Security mode with no enabled scanners returns empty, no panic.
@@ -329,7 +332,7 @@ async fn scan_04_security_mode_no_enabled_scanners_returns_empty() {
         .expect("Security mode run must not error");
 
     assert!(
-        result.is_empty(),
+        result.findings.is_empty(),
         "no enabled scanners => empty findings in Security mode"
     );
 }

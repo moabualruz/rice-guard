@@ -20,13 +20,10 @@ install:
 commands:
   scan:
     cmd: "semgrep --config auto --json -o {{output_dir}}/semgrep.json ."
-    timeout: 300
   security:
     cmd: "semgrep --config p/security --json -o {{output_dir}}/semgrep.json ."
-    timeout: 300
   quick:
     cmd: "semgrep --config p/default --json -o {{output_dir}}/semgrep.json ."
-    timeout: 120
 output_format: json
 severity_map:
   ERROR: critical

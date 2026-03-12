@@ -144,13 +144,13 @@ impl RiceGuardMcpServer {
             .map_err(|e| rmcp::ErrorData::internal_error(format!("Descriptor load: {e}"), None))?;
 
         let engine = ScannerEngine::new(descriptors, cfg.clone());
-        let findings = engine
+        let report = engine
             .run(&project_root, mode, &output_dir)
             .await
             .map_err(|e| rmcp::ErrorData::internal_error(format!("Scan failed: {e}"), None))?;
 
         // build_batch returns Vec<Issue> directly (infallible)
-        let issues = IssueBuilder::build_batch(&findings, &project_root, &[]);
+        let issues = IssueBuilder::build_batch(&report.findings, &project_root, &[]);
 
         let now = epoch_timestamp();
         let summary = OutputWriter::build_summary(&issues, &p.path, &now, vec![], 0);
@@ -434,7 +434,7 @@ async fn run_fixer(
         stage_filter,
         dry_run,
         include_unsafe: unsafe_fixes,
-        timeout_secs: 120,
+        timeout_secs: None,
         output_dir,
         latest_dir,
         issue_ids,

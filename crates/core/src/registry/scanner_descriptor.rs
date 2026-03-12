@@ -52,8 +52,10 @@ pub struct ScannerCommands {
 pub struct ScannerCommand {
     /// Command template string. Placeholders: `{{output_dir}}`, `{{target}}`.
     pub cmd: String,
-    /// Timeout in seconds before the scanner is killed.
-    pub timeout: u32,
+    /// Optional timeout in seconds. When absent, the scanner runs until it
+    /// finishes. Users can set this globally or per-scanner in `.riceguard.yaml`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u32>,
 }
 
 impl ScannerDescriptor {

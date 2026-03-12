@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use thiserror::Error;
@@ -10,6 +11,19 @@ use super::{
     diff_only_filter, parser::parse_scanner_output, run_one_scanner, OutputDir, RawFinding,
     ScannerRunError,
 };
+
+/// Result of a scan run, including per-scanner outcome information.
+#[derive(Debug)]
+pub struct ScanReport {
+    /// All parsed findings from all scanners.
+    pub findings: Vec<RawFinding>,
+    /// Names of scanners that ran successfully (may have 0 findings).
+    pub succeeded: HashSet<String>,
+    /// `(scanner_name, error_message)` for scanners that failed or timed out.
+    pub failed: Vec<(String, String)>,
+    /// Names of scanners that were unavailable (disabled in config).
+    pub unavailable: Vec<String>,
+}
 
 /// Scanner names included in Quick mode: jscpd + scc + Semgrep + Trivy.
 pub const QUICK_SCANNERS: &[&str] = &["semgrep", "trivy", "jscpd", "scc"];
@@ -87,7 +101,7 @@ impl ScannerEngine {
         target: &Path,
         mode: ScanMode,
         output_dir: &OutputDir,
-    ) -> Result<Vec<RawFinding>, ScannerEngineError> {
+    ) -> Result<ScanReport, ScannerEngineError> {
         // ── Step 1: select scanner subset based on mode ───────────────────────
         let selected: Vec<&ScannerDescriptor> = match mode {
             ScanMode::Quick => self
@@ -132,28 +146,39 @@ impl ScannerEngine {
             });
         }
 
-        // ── Step 3: collect results, warn on individual failures ──────────────
+        // ── Step 3: collect results, track per-scanner outcomes ──────────────
         let mut all_findings: Vec<RawFinding> = Vec::new();
+        let mut succeeded: HashSet<String> = HashSet::new();
+        let mut failed: Vec<(String, String)> = Vec::new();
+        let mut unavailable: Vec<String> = Vec::new();
 
         while let Some(join_result) = set.join_next().await {
             match join_result {
-                Ok(Ok((_scanner_name, findings))) => {
+                Ok(Ok((scanner_name, findings))) => {
+                    succeeded.insert(scanner_name);
                     all_findings.extend(findings);
                 }
                 Ok(Err(ScannerRunError::Unavailable(name))) => {
                     tracing::warn!("scanner {} unavailable — skipping", name);
+                    unavailable.push(name);
                 }
                 Ok(Err(ScannerRunError::Timeout(name))) => {
-                    tracing::warn!("scanner {} timed out — skipping", name);
+                    let msg = format!("timed out");
+                    tracing::warn!("scanner {} {} — skipping", name, msg);
+                    failed.push((name, msg));
                 }
                 Ok(Err(ScannerRunError::SpawnFailed { scanner, reason })) => {
                     tracing::warn!("scanner {} failed: {} — skipping", scanner, reason);
+                    failed.push((scanner, reason));
                 }
                 Ok(Err(ScannerRunError::CommandBuildError(e))) => {
-                    tracing::warn!("scanner command build error: {} — skipping", e);
+                    let msg = e.to_string();
+                    tracing::warn!("scanner command build error: {} — skipping", msg);
+                    failed.push(("unknown".to_string(), msg));
                 }
                 Err(join_err) => {
                     tracing::warn!("scanner task panicked: {} — skipping", join_err);
+                    failed.push(("unknown".to_string(), join_err.to_string()));
                 }
             }
         }
@@ -195,6 +220,11 @@ impl ScannerEngine {
             }
         }
 
-        Ok(all_findings)
+        Ok(ScanReport {
+            findings: all_findings,
+            succeeded,
+            failed,
+            unavailable,
+        })
     }
 }

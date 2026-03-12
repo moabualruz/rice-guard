@@ -28,9 +28,7 @@ install:
 commands:
   scan:
     cmd: "scc --format json --by-file --out {{output_dir}}/scc.json ."
-    timeout: 60
   quick:
     cmd: "scc --format json --out {{output_dir}}/scc.json ."
-    timeout: 30
-output_format: json
+output_format: scc-json
 severity_map: {}

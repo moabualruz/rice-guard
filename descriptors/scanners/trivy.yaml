@@ -23,13 +23,10 @@ install:
 commands:
   scan:
     cmd: "trivy fs --format sarif --output {{output_dir}}/trivy.sarif ."
-    timeout: 300
   security:
     cmd: "trivy fs --scanners vuln,secret,config --format sarif --output {{output_dir}}/trivy.sarif ."
-    timeout: 300
   quick:
     cmd: "trivy fs --scanners vuln --format sarif --output {{output_dir}}/trivy.sarif ."
-    timeout: 120
 output_format: sarif
 severity_map:
   CRITICAL: critical

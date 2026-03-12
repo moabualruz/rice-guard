@@ -100,8 +100,9 @@ fn find_jscpd_json(dir: &std::path::Path) -> Result<Option<String>, ParseError> 
 
 /// Parse jscpd JSON content string into findings.
 fn parse_jscpd_content(content: &str, scanner: &str) -> Result<Vec<RawFinding>, ParseError> {
+    let sanitized = sanitize_json_surrogates(content);
     let output: JscpdOutput =
-        serde_json::from_str(content).map_err(|e| ParseError::JsonError(e.to_string()))?;
+        serde_json::from_str(&sanitized).map_err(|e| ParseError::JsonError(e.to_string()))?;
 
     let findings = output
         .duplicates
@@ -123,4 +124,130 @@ fn parse_jscpd_content(content: &str, scanner: &str) -> Result<Vec<RawFinding>, 
         .collect();
 
     Ok(findings)
+}
+
+// -- UTF-16 surrogate sanitization -------------------------------------------
+
+/// Sanitize orphaned UTF-16 surrogates in raw JSON text.
+///
+/// jscpd truncates code fragments mid-emoji, producing orphaned surrogates
+/// like `\ud83d` that `serde_json` rejects. This replaces orphaned
+/// `\uD800`–`\uDFFF` escapes with `\uFFFD` (replacement character).
+fn sanitize_json_surrogates(input: &str) -> String {
+    // Fast path: no surrogate escapes present.
+    if !input.contains("\\ud") && !input.contains("\\uD") {
+        return input.to_string();
+    }
+
+    let bytes = input.as_bytes();
+    let len = bytes.len();
+    let mut result = String::with_capacity(len);
+    let mut copy_from = 0;
+    let mut i = 0;
+
+    while i + 5 < len {
+        if bytes[i] == b'\\' && bytes[i + 1] == b'u' {
+            if let Some(cp) = hex4(bytes, i + 2) {
+                if (0xD800..=0xDBFF).contains(&cp) {
+                    // High surrogate — valid only if followed by \uDC00–\uDFFF.
+                    let has_low = i + 11 < len
+                        && bytes[i + 6] == b'\\'
+                        && bytes[i + 7] == b'u'
+                        && hex4(bytes, i + 8).map_or(false, |low| (0xDC00..=0xDFFF).contains(&low));
+                    if has_low {
+                        i += 12;
+                        continue;
+                    }
+                    // Orphaned high surrogate.
+                    result.push_str(&input[copy_from..i]);
+                    result.push_str("\\uFFFD");
+                    i += 6;
+                    copy_from = i;
+                    continue;
+                } else if (0xDC00..=0xDFFF).contains(&cp) {
+                    // Orphaned low surrogate.
+                    result.push_str(&input[copy_from..i]);
+                    result.push_str("\\uFFFD");
+                    i += 6;
+                    copy_from = i;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    result.push_str(&input[copy_from..]);
+    result
+}
+
+/// Parse 4 hex digits from `bytes[start..start+4]` into a u16.
+fn hex4(bytes: &[u8], start: usize) -> Option<u16> {
+    if start + 4 > bytes.len() {
+        return None;
+    }
+    let s = std::str::from_utf8(&bytes[start..start + 4]).ok()?;
+    u16::from_str_radix(s, 16).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_no_surrogates() {
+        let input = r#"{"key": "hello \u0041 world"}"#;
+        assert_eq!(sanitize_json_surrogates(input), input);
+    }
+
+    #[test]
+    fn sanitize_orphaned_high_surrogate() {
+        let input = r#"{"fragment": "emoji \ud83d end"}"#;
+        let expected = r#"{"fragment": "emoji \uFFFD end"}"#;
+        assert_eq!(sanitize_json_surrogates(input), expected);
+    }
+
+    #[test]
+    fn sanitize_orphaned_low_surrogate() {
+        let input = r#"{"fragment": "bad \ude00 end"}"#;
+        let expected = r#"{"fragment": "bad \uFFFD end"}"#;
+        assert_eq!(sanitize_json_surrogates(input), expected);
+    }
+
+    #[test]
+    fn sanitize_valid_surrogate_pair_preserved() {
+        // Valid pair: \uD83D\uDE00 = 😀
+        let input = r#"{"fragment": "emoji \uD83D\uDE00 end"}"#;
+        assert_eq!(sanitize_json_surrogates(input), input);
+    }
+
+    #[test]
+    fn sanitize_multiple_orphans() {
+        let input = r#"{"a": "\ud83d", "b": "\ude00"}"#;
+        let expected = r#"{"a": "\uFFFD", "b": "\uFFFD"}"#;
+        assert_eq!(sanitize_json_surrogates(input), expected);
+    }
+
+    #[test]
+    fn sanitize_high_surrogate_at_end_of_string() {
+        let input = r#"{"fragment": "trunc\ud83d"}"#;
+        let expected = r#"{"fragment": "trunc\uFFFD"}"#;
+        assert_eq!(sanitize_json_surrogates(input), expected);
+    }
+
+    #[test]
+    fn parse_jscpd_content_with_orphaned_surrogates() {
+        let json = r#"{"duplicates": [{"firstFile": {"name": "src/a.ts"}, "secondFile": {"name": "src/b.ts"}, "fragment": "code \ud83d here"}]}"#;
+        let findings = parse_jscpd_content(json, "jscpd").unwrap();
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].file_path, "src/a.ts");
+        assert_eq!(findings[0].rule_id, "jscpd.duplication");
+    }
+
+    #[test]
+    fn parse_jscpd_content_empty_duplicates() {
+        let json = r#"{"duplicates": []}"#;
+        let findings = parse_jscpd_content(json, "jscpd").unwrap();
+        assert!(findings.is_empty());
+    }
 }

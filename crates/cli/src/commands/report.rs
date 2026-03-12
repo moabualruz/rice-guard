@@ -31,10 +31,7 @@ pub struct SonarStatusReport {
 /// and writes `sonar-status.json` to `reports/{project_name}/`.
 pub async fn run(args: ReportArgs) -> anyhow::Result<i32> {
     // ── Step 1: resolve target path ───────────────────────────────────────────
-    let target = args
-        .path
-        .canonicalize()
-        .unwrap_or_else(|_| args.path.clone());
+    let target = crate::paths::safe_canonicalize(&args.path);
 
     // ── Step 2: load config ───────────────────────────────────────────────────
     let config_path = target.join(".riceguard.yaml");

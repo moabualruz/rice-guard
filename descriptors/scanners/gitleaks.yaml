@@ -21,13 +21,10 @@ install:
 commands:
   scan:
     cmd: "gitleaks detect --source . --report-format sarif --report-path {{output_dir}}/gitleaks.sarif --no-git"
-    timeout: 180
   security:
     cmd: "gitleaks detect --source . --report-format sarif --report-path {{output_dir}}/gitleaks.sarif"
-    timeout: 300
   quick:
     cmd: "gitleaks detect --source . --report-format json --report-path {{output_dir}}/gitleaks.json --no-git --log-opts HEAD~1..HEAD"
-    timeout: 60
 output_format: sarif
 severity_map:
   HIGH: high

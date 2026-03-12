@@ -16,6 +16,38 @@ pub enum ProbeResult {
     Error(String),
 }
 
+/// Build a `tokio::process::Command` that correctly handles Windows `.cmd`/`.bat`
+/// wrappers (e.g. npm-installed tools like `jscpd`).
+///
+/// On Windows, `CreateProcessW` does not consult `PATHEXT` so bare names like
+/// `"jscpd"` fail to resolve to `jscpd.cmd`. We use `which::which` (which does
+/// respect `PATHEXT`) to find the real path, then route `.cmd`/`.bat` through
+/// `cmd /c` so Windows can execute them.
+pub fn resolve_command(exe: &str) -> tokio::process::Command {
+    #[cfg(windows)]
+    {
+        if let Ok(resolved) = which::which(exe) {
+            let ext = resolved
+                .extension()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
+            if ext == "cmd" || ext == "bat" {
+                let mut cmd = tokio::process::Command::new("cmd");
+                cmd.arg("/c").arg(&resolved);
+                return cmd;
+            }
+            return tokio::process::Command::new(resolved);
+        }
+        // which failed — fall through to bare name so the caller gets NotFound
+        tokio::process::Command::new(exe)
+    }
+    #[cfg(not(windows))]
+    {
+        tokio::process::Command::new(exe)
+    }
+}
+
 /// Build an argument vector from a command template by substituting `{{placeholder}}`
 /// tokens with their values and then splitting the result via `shlex`.
 ///
@@ -82,7 +114,7 @@ pub async fn probe_scanner(descriptor: &ScannerDescriptor) -> ProbeResult {
         }
     };
 
-    let output = match tokio::process::Command::new(&tokens[0])
+    let output = match resolve_command(&tokens[0])
         .args(&tokens[1..])
         .output()
         .await
@@ -246,7 +278,7 @@ mod tests {
             commands: ScannerCommands {
                 scan: ScannerCommand {
                     cmd: "nonexistent-tool-xyz-abc123 scan .".to_string(),
-                    timeout: 60,
+                    timeout: None,
                 },
                 security: None,
                 quick: None,

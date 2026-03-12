@@ -14,10 +14,7 @@ use std::path::PathBuf;
 /// Returns exit code 0 on success. Any error propagates as exit code 2
 /// via the main.rs error handler.
 pub async fn run(args: InitArgs) -> anyhow::Result<i32> {
-    let project_path = args
-        .path
-        .canonicalize()
-        .unwrap_or_else(|_| args.path.clone());
+    let project_path = crate::paths::safe_canonicalize(&args.path);
 
     output::print_info("Detecting project languages and available tools...");
 

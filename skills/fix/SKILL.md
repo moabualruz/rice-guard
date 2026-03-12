@@ -1,20 +1,24 @@
 # rice-guard fix — AI Agent Skill
 
 ## Name
+
 `rice-guard-fix` — Deterministic auto-fixing for code quality issues.
 
 ## Description
+
 Runs only deterministic fixers — zero AI, zero tokens. Applies formatters,
 linter auto-fixes, security patches, AST rewrites, and dependency updates
 in a safe, ordered pipeline.
 
 ## When to Use
+
 - **After scan**: Fix auto-fixable issues found by `rice-guard scan`
 - **CI fix step**: Automated remediation in CI pipelines
 - **Pre-commit**: Quick formatting + linting before committing
 - **Targeted fix**: Fix a specific issue by ID
 
 ## Prerequisites
+
 - `rice-guard` binary installed
 - `.riceguard.yaml` config exists
 - Fixer tools installed (rustfmt, clippy, ruff, biome, etc.)
@@ -22,11 +26,13 @@ in a safe, ordered pipeline.
 ## Commands
 
 ### Fix all (run all enabled fixer stages)
+
 ```bash
 rice-guard fix [path]
 ```
 
 ### Fix by category
+
 ```bash
 rice-guard fix [path] --formatters    # Formatters only
 rice-guard fix [path] --linters       # Linter auto-fix only
@@ -37,22 +43,26 @@ rice-guard fix [path] --imports       # Import cleanup only
 ```
 
 ### Preview fixes (no changes applied)
+
 ```bash
 rice-guard fix [path] --dry-run
 ```
 
 ### Fix specific issues
+
 ```bash
 rice-guard fix [path] --issue <ID>           # Fix one issue by ID
 rice-guard fix [path] --issues issues.json   # Fix issues from a file
 ```
 
 ### Include unsafe fixes (requires confirmation)
+
 ```bash
 rice-guard fix [path] --unsafe --yes    # Skip confirmation (CI)
 ```
 
 ### Additional flags
+
 ```bash
 rice-guard fix [path] --diff            # Include diffs in report
 rice-guard fix [path] --rescan          # Re-check after fixing
@@ -106,15 +116,16 @@ scan → fix → rescan → verify
 
 ## MCP Integration
 
-| Tool | Description |
-|------|-------------|
-| `fix_all` | Run all fixer stages |
-| `fix_issue` | Fix a specific issue by ID |
-| `fix_preview` | Preview fixes without applying (dry-run) |
-| `get_fix_report` | Get the latest fix report |
-| `verify_fix` | Re-check a specific issue after fixing |
+| Tool             | Description                              |
+| ---------------- | ---------------------------------------- |
+| `fix_all`        | Run all fixer stages                     |
+| `fix_issue`      | Fix a specific issue by ID               |
+| `fix_preview`    | Preview fixes without applying (dry-run) |
+| `get_fix_report` | Get the latest fix report                |
+| `verify_fix`     | Re-check a specific issue after fixing   |
 
 ## Exit Codes
+
 - `0` — All fixes applied successfully (or dry-run)
 - `1` — Some fixes failed
 - `2` — Tool error (config missing, fixer not found)

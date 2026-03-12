@@ -19,11 +19,9 @@ install:
 commands:
   scan:
     cmd: "jscpd . --reporters json --output {{output_dir}}"
-    timeout: 120
   quick:
     cmd: "jscpd . --reporters json --output {{output_dir}} --threshold 10"
-    timeout: 60
-output_format: json
+output_format: jscpd-json
 severity_map:
   high: high
   medium: medium

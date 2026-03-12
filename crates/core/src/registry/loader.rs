@@ -254,7 +254,6 @@ install:
 commands:
   scan:
     cmd: "custom-scanner --json ."
-    timeout: 60
 output_format: json
 severity_map: {}
 "#;

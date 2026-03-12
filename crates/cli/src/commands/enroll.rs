@@ -17,10 +17,7 @@ use super::sonar::models::{ProjectsSearchResponse, SonarGenericIssuesFile};
 /// user can run `sonar-scanner` immediately after.
 pub async fn run(args: EnrollArgs) -> anyhow::Result<i32> {
     // ── Step 1: resolve target path ───────────────────────────────────────────
-    let target = args
-        .path
-        .canonicalize()
-        .unwrap_or_else(|_| args.path.clone());
+    let target = crate::paths::safe_canonicalize(&args.path);
 
     // ── Step 2: load config ───────────────────────────────────────────────────
     let config_path = target.join(".riceguard.yaml");
