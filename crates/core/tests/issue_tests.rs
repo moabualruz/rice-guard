@@ -267,10 +267,15 @@ mod issue_tests {
         let writer = make_output_writer(dir.path());
         writer.write_all(&issues, &summary).expect("write_all");
 
+        // Files now use the IssueOutput wrapper: { schema_version, issues: [...] }
         let fixable_bytes =
             std::fs::read(dir.path().join("issues-fixable.json")).expect("read fixable");
-        let fixable: Vec<rice_guard_core::issue::Issue> =
+        let fixable_val: serde_json::Value =
             serde_json::from_slice(&fixable_bytes).expect("parse fixable");
+        let fixable: Vec<rice_guard_core::issue::Issue> = serde_json::from_value(
+            fixable_val["issues"].clone(),
+        )
+        .expect("parse fixable issues array");
         assert_eq!(fixable.len(), 2, "fixable.json must contain 2 issues");
         assert!(
             fixable.iter().all(|i| i.fix.auto_fixable),
@@ -279,8 +284,12 @@ mod issue_tests {
 
         let remaining_bytes =
             std::fs::read(dir.path().join("issues-remaining.json")).expect("read remaining");
-        let remaining: Vec<rice_guard_core::issue::Issue> =
+        let remaining_val: serde_json::Value =
             serde_json::from_slice(&remaining_bytes).expect("parse remaining");
+        let remaining: Vec<rice_guard_core::issue::Issue> = serde_json::from_value(
+            remaining_val["issues"].clone(),
+        )
+        .expect("parse remaining issues array");
         assert_eq!(remaining.len(), 1, "remaining.json must contain 1 issue");
         assert!(
             remaining.iter().all(|i| !i.fix.auto_fixable),
@@ -309,6 +318,10 @@ mod issue_tests {
         assert_eq!(parsed.total_issues, 3, "total_issues must be 3");
         assert_eq!(parsed.fixable_count, 2, "fixable_count must be 2");
         assert_eq!(parsed.remaining_count, 1, "remaining_count must be 1");
+        assert_eq!(
+            parsed.schema_version, "1.0",
+            "summary.json must have schema_version: \"1.0\""
+        );
     }
 
     // ── EVID-11: summary.txt is ASCII table ───────────────────────────────────
@@ -339,6 +352,63 @@ mod issue_tests {
         assert!(
             content.contains('-'),
             "summary.txt must contain '-' borders"
+        );
+    }
+
+    // ── EVID-09 / EVID-10: schema_version in output files ───────────────────
+
+    /// EVID-09 — issues.json contains "schema_version": "1.0" at top level.
+    #[test]
+    fn output_schema_version_present() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let issues = vec![
+            make_test_issue("issue-1", true, "src/main.rs"),
+            make_test_issue("issue-2", false, "src/lib.rs"),
+        ];
+        let summary = make_summary(&issues);
+        let writer = make_output_writer(dir.path());
+        writer.write_all(&issues, &summary).expect("write_all");
+
+        // issues.json must have schema_version at top level.
+        let bytes = std::fs::read(dir.path().join("issues.json")).expect("read issues.json");
+        let val: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("parse issues.json as JSON");
+        assert_eq!(
+            val["schema_version"].as_str(),
+            Some("1.0"),
+            "issues.json must have schema_version: \"1.0\" at top level"
+        );
+
+        // issues-fixable.json must also have schema_version.
+        let fix_bytes =
+            std::fs::read(dir.path().join("issues-fixable.json")).expect("read fixable");
+        let fix_val: serde_json::Value =
+            serde_json::from_slice(&fix_bytes).expect("parse fixable");
+        assert_eq!(
+            fix_val["schema_version"].as_str(),
+            Some("1.0"),
+            "issues-fixable.json must have schema_version"
+        );
+
+        // issues-remaining.json must also have schema_version.
+        let rem_bytes =
+            std::fs::read(dir.path().join("issues-remaining.json")).expect("read remaining");
+        let rem_val: serde_json::Value =
+            serde_json::from_slice(&rem_bytes).expect("parse remaining");
+        assert_eq!(
+            rem_val["schema_version"].as_str(),
+            Some("1.0"),
+            "issues-remaining.json must have schema_version"
+        );
+
+        // summary.json must have schema_version directly (not wrapped).
+        let sum_bytes = std::fs::read(dir.path().join("summary.json")).expect("read summary.json");
+        let sum_val: serde_json::Value =
+            serde_json::from_slice(&sum_bytes).expect("parse summary.json");
+        assert_eq!(
+            sum_val["schema_version"].as_str(),
+            Some("1.0"),
+            "summary.json must have schema_version: \"1.0\""
         );
     }
 
@@ -751,6 +821,7 @@ mod issue_tests {
         use std::collections::HashMap;
 
         let summary = ScanSummary {
+            schema_version: "1.0".to_string(),
             scanned_at: "2026-03-11T00:00:00Z".to_string(),
             project_path: "/path/to/project".to_string(),
             total_issues: 10,

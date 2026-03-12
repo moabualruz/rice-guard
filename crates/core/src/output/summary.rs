@@ -11,6 +11,9 @@ use crate::issue::{FixComplexity, Issue};
 /// Serialized to `summary.json` in the output directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanSummary {
+    /// Schema version — always `"1.0"`. Enables forward-compatible parsing.
+    pub schema_version: String,
+
     /// ISO-8601 timestamp when the scan started.
     pub scanned_at: String,
 
@@ -93,6 +96,7 @@ impl ScanSummary {
         let scanned_at = chrono::Utc::now().to_rfc3339();
 
         ScanSummary {
+            schema_version: "1.0".to_string(),
             scanned_at,
             project_path: project_path.to_string(),
             total_issues,
@@ -114,6 +118,7 @@ mod tests {
     #[test]
     fn scan_summary_serializes_to_json() {
         let summary = ScanSummary {
+            schema_version: "1.0".to_string(),
             scanned_at: "2026-03-11T00:00:00Z".to_string(),
             project_path: "/project".to_string(),
             total_issues: 5,
@@ -133,11 +138,13 @@ mod tests {
         assert!(json.contains("total_issues"));
         assert!(json.contains("fixable_count"));
         assert!(json.contains("scan_duration_ms"));
+        assert!(json.contains("schema_version"), "summary.json must have schema_version");
     }
 
     #[test]
     fn scan_summary_fixable_plus_remaining_equals_total() {
         let summary = ScanSummary {
+            schema_version: "1.0".to_string(),
             scanned_at: String::new(),
             project_path: String::new(),
             total_issues: 10,

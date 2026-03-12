@@ -15,6 +15,18 @@ use serde::Serialize;
 use crate::issue::Issue;
 use crate::output::summary::ScanSummary;
 
+/// JSON wrapper that adds a `schema_version` field at the top level of all
+/// three issue output files (issues.json, issues-fixable.json, issues-remaining.json).
+///
+/// This enables forward-compatible parsing by consumers (AI tools, CI pipelines).
+#[derive(Serialize)]
+struct IssueOutput<'a> {
+    /// Schema version — always `"1.0"`.
+    schema_version: &'static str,
+    /// The issue list for this file.
+    issues: &'a [Issue],
+}
+
 /// Write a serializable value to a file as pretty-printed JSON.
 pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> anyhow::Result<()> {
     let f = std::fs::File::create(path).with_context(|| format!("create {}", path.display()))?;
@@ -123,13 +135,27 @@ pub(crate) fn write_all_files(
     let normalized = normalize_issues(issues);
 
     // Split into fixable and remaining subsets.
-    let fixable: Vec<&Issue> = normalized.iter().filter(|i| i.fix.auto_fixable).collect();
-    let remaining: Vec<&Issue> = normalized.iter().filter(|i| !i.fix.auto_fixable).collect();
+    let fixable: Vec<Issue> = normalized.iter().filter(|i| i.fix.auto_fixable).cloned().collect();
+    let remaining: Vec<Issue> = normalized.iter().filter(|i| !i.fix.auto_fixable).cloned().collect();
+
+    // Wrap each issue list with schema_version for forward compatibility (EVID-09).
+    let all_output = IssueOutput {
+        schema_version: "1.0",
+        issues: &normalized,
+    };
+    let fixable_output = IssueOutput {
+        schema_version: "1.0",
+        issues: &fixable,
+    };
+    let remaining_output = IssueOutput {
+        schema_version: "1.0",
+        issues: &remaining,
+    };
 
     // Write all five files.
-    write_json(&dir.join("issues.json"), &normalized)?;
-    write_json(&dir.join("issues-fixable.json"), &fixable)?;
-    write_json(&dir.join("issues-remaining.json"), &remaining)?;
+    write_json(&dir.join("issues.json"), &all_output)?;
+    write_json(&dir.join("issues-fixable.json"), &fixable_output)?;
+    write_json(&dir.join("issues-remaining.json"), &remaining_output)?;
     write_json(&dir.join("summary.json"), summary)?;
     write_summary_txt(&dir.join("summary.txt"), &normalized)?;
 

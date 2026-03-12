@@ -103,6 +103,7 @@ impl OutputWriter {
         }
 
         ScanSummary {
+            schema_version: "1.0".to_string(),
             scanned_at: scanned_at.to_string(),
             project_path: project_path.to_string(),
             total_issues,
