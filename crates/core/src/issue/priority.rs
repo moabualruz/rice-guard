@@ -93,6 +93,54 @@ pub fn file_freq_map(findings: &[RawFinding]) -> HashMap<String, u32> {
     map
 }
 
+/// Compute file frequency score combining issue density + git commit churn.
+///
+/// ## Formula
+///
+/// ```text
+/// score = min(issue_count_norm + churn_norm, 10)
+/// ```
+///
+/// Where:
+/// - `issue_count_norm = min(issues_per_file, 5)` (0-5)
+/// - `churn_norm = min(git_commit_count / 10, 5)` (0-5, capped; 50+ commits → 5)
+///
+/// Git churn is obtained via `git log --follow --oneline -- <file>`. If git
+/// is unavailable or the directory is not a git repository, `churn_norm = 0`
+/// (graceful fallback — no panic, no error).
+pub fn file_freq_with_churn(
+    findings: &[RawFinding],
+    project_root: &std::path::Path,
+) -> HashMap<String, u32> {
+    let issue_counts = file_freq_map(findings);
+    let mut result = HashMap::new();
+    for (file_path, count) in &issue_counts {
+        let issue_norm = (*count).min(5);
+        let churn_norm = git_churn_for_file(file_path, project_root);
+        result.insert(file_path.clone(), (issue_norm + churn_norm).min(10));
+    }
+    result
+}
+
+/// Query git for the number of commits that touched `file_path`.
+///
+/// Returns a normalized 0-5 contribution (50+ commits → 5).
+/// Returns 0 on any error (git not installed, not a git repo, etc.).
+fn git_churn_for_file(file_path: &str, project_root: &std::path::Path) -> u32 {
+    let output = std::process::Command::new("git")
+        .args(["log", "--follow", "--oneline", "--", file_path])
+        .current_dir(project_root)
+        .output();
+    match output {
+        Ok(out) if out.status.success() => {
+            // Count newlines as a proxy for line count.
+            let lines = out.stdout.iter().filter(|&&b| b == b'\n').count() as u32;
+            (lines / 10).min(5)
+        }
+        _ => 0,
+    }
+}
+
 /// Sort a slice of [`super::Issue`] by `priority_score` descending (highest first).
 ///
 /// Issues with equal scores retain their original relative order (stable sort).

@@ -16,6 +16,24 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Lightweight descriptor of a fixer tool for a specific language.
+///
+/// Created from fixer YAML descriptors at runtime (or directly in tests).
+/// Used by [`FixMetadata::from_finding_with_descriptors`] to determine
+/// whether a deterministic fixer is available for the file's language.
+#[derive(Debug, Clone)]
+pub struct FixerDescriptorInfo {
+    /// Language identifier matching the fixer descriptor (e.g. `"python"`, `"rust"`).
+    pub language: String,
+
+    /// Names of the stages present in this descriptor (e.g. `["formatters", "linters"]`).
+    pub stages: Vec<String>,
+
+    /// The first non-empty fix command from the descriptor, if any.
+    /// Used as the `auto_fix_tool` value in the resulting `FixMetadata`.
+    pub fix_tool: Option<String>,
+}
+
 /// Effort complexity of applying a fix.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -74,6 +92,70 @@ impl FixMetadata {
         }
     }
 
+    /// Build fix metadata using fixer descriptor lookup.
+    ///
+    /// Resolution order:
+    /// 1. If `suggested_replacement` present → scanner autofix (same as `from_finding`).
+    /// 2. Match `file_ext` (case-insensitive) against descriptor `language` fields.
+    ///    - Common language → extension mapping:
+    ///      `python` → `.py`, `rust` → `.rs`, `go` → `.go`, `typescript` → `.ts`,
+    ///      `javascript` → `.js`, `java` → `.java`, `kotlin` → `.kt`,
+    ///      `php` → `.php`, `csharp`/`c#` → `.cs`, `ruby` → `.rb`,
+    ///      `dart` → `.dart`, `shell`/`bash` → `.sh`.
+    /// 3. If a descriptor matches, `auto_fixable=true` with the descriptor's fix_tool.
+    /// 4. Else fall back to `from_finding` heuristics.
+    pub fn from_finding_with_descriptors(
+        scanner: &str,
+        rule_id: &str,
+        suggested_replacement: Option<&str>,
+        file_ext: &str,
+        descriptors: &[FixerDescriptorInfo],
+    ) -> Self {
+        // Step 1: scanner-provided replacement takes priority.
+        if let Some(snippet) = suggested_replacement {
+            return Self::scanner_autofix(
+                snippet.to_string(),
+                format!("semgrep --autofix --config={rule_id} <file>"),
+                "security".to_string(),
+            );
+        }
+
+        // Step 2: try to find a descriptor for the file's language.
+        let ext_lower = file_ext.to_lowercase();
+        let lang = ext_to_language(&ext_lower);
+
+        if let Some(lang_name) = lang {
+            if let Some(descriptor) = descriptors
+                .iter()
+                .find(|d| d.language.to_lowercase() == lang_name)
+            {
+                // Determine category from first matching stage.
+                let category = descriptor
+                    .stages
+                    .first()
+                    .map(|s| stage_to_category(s))
+                    .unwrap_or("linter");
+
+                let complexity = match category {
+                    "formatter" | "import" => FixComplexity::Trivial,
+                    "linter" | "security" => FixComplexity::Trivial,
+                    _ => FixComplexity::Moderate,
+                };
+
+                return Self {
+                    auto_fixable: true,
+                    auto_fix_tool: descriptor.fix_tool.clone(),
+                    auto_fix_category: Some(category.to_string()),
+                    suggested_replacement: None,
+                    complexity,
+                };
+            }
+        }
+
+        // Step 3: fall back to heuristic-based lookup.
+        Self::from_finding(scanner, rule_id, None)
+    }
+
     /// Build fix metadata from scanner fields and rule identifiers.
     ///
     /// Resolution order:
@@ -100,6 +182,43 @@ impl FixMetadata {
         }
 
         Self::manual(FixComplexity::Moderate)
+    }
+}
+
+/// Map a file extension to a canonical language name matching fixer descriptors.
+///
+/// Returns `None` for unsupported extensions.
+fn ext_to_language(ext: &str) -> Option<&'static str> {
+    match ext {
+        "py" => Some("python"),
+        "rs" => Some("rust"),
+        "go" => Some("go"),
+        "ts" | "tsx" => Some("typescript"),
+        "js" | "jsx" | "mjs" | "cjs" => Some("javascript"),
+        "java" => Some("java"),
+        "kt" => Some("kotlin"),
+        "php" => Some("php"),
+        "cs" => Some("csharp"),
+        "rb" => Some("ruby"),
+        "dart" => Some("dart"),
+        "sh" | "bash" => Some("shell"),
+        _ => None,
+    }
+}
+
+/// Map a fixer descriptor stage name to a fix category string.
+fn stage_to_category(stage: &str) -> &'static str {
+    match stage {
+        "formatters" => "formatter",
+        "linters" => "linter",
+        "security" => "security",
+        "ast" => "ast",
+        "deps" => "deps",
+        "imports" => "import",
+        // singular forms (for compatibility)
+        "formatter" => "formatter",
+        "linter" => "linter",
+        _ => "linter",
     }
 }
 

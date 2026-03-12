@@ -445,6 +445,303 @@ mod issue_tests {
         );
     }
 
+    // ── EVID-05: Descriptor-driven auto_fixable ───────────────────────────────
+
+    /// EVID-05 — auto_fixable is true when a fixer descriptor exists for the
+    /// file's language (descriptor-driven lookup).
+    #[test]
+    fn descriptor_driven_auto_fixable_python() {
+        use rice_guard_core::issue::{FixMetadata, FixerDescriptorInfo};
+        let descriptors = vec![FixerDescriptorInfo {
+            language: "python".to_string(),
+            stages: vec!["linters".to_string()],
+            fix_tool: Some("ruff check --fix .".to_string()),
+        }];
+        let meta = FixMetadata::from_finding_with_descriptors(
+            "semgrep",
+            "python.security.eval",
+            None,
+            "py",
+            &descriptors,
+        );
+        assert!(
+            meta.auto_fixable,
+            "auto_fixable must be true when python fixer descriptor exists"
+        );
+        assert_eq!(
+            meta.auto_fix_tool.as_deref(),
+            Some("ruff check --fix ."),
+            "auto_fix_tool must match descriptor fix_tool"
+        );
+    }
+
+    /// EVID-05 — auto_fixable is false when no descriptor matches the extension.
+    #[test]
+    fn descriptor_driven_auto_fixable_no_descriptor() {
+        use rice_guard_core::issue::{FixMetadata, FixerDescriptorInfo};
+        let descriptors = vec![FixerDescriptorInfo {
+            language: "python".to_string(),
+            stages: vec!["linters".to_string()],
+            fix_tool: Some("ruff check --fix .".to_string()),
+        }];
+        let meta = FixMetadata::from_finding_with_descriptors(
+            "semgrep",
+            "some-rule",
+            None,
+            "xyz",
+            &descriptors,
+        );
+        assert!(
+            !meta.auto_fixable,
+            "auto_fixable must be false when no descriptor matches .xyz extension"
+        );
+    }
+
+    /// EVID-05 — IssueBuilder::build_batch() sets cross_file=true when same
+    /// rule_id appears in 3+ distinct files.
+    #[test]
+    fn cross_file_penalty_triggers_at_3_files() {
+        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        let make = |file: &str| RawFinding {
+            scanner: "semgrep".to_string(),
+            rule_id: "python.security.eval".to_string(),
+            severity: "warning".to_string(),
+            file_path: file.to_string(),
+            line: 1,
+            message: "eval usage".to_string(),
+            matched_code: None,
+            suggested_replacement: None,
+        };
+
+        let findings = vec![make("src/a.py"), make("src/b.py"), make("src/c.py")];
+        let descriptors: Vec<FixerDescriptorInfo> = vec![];
+        let issues = IssueBuilder::build_batch(&findings, std::path::Path::new("."), &descriptors);
+        assert_eq!(issues.len(), 3);
+        assert!(
+            issues.iter().all(|i| i.cross_file),
+            "all issues must have cross_file=true when rule in 3+ files"
+        );
+    }
+
+    /// EVID-05 — cross_file remains false when rule appears in fewer than 3 files.
+    #[test]
+    fn cross_file_no_penalty_below_threshold() {
+        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        let make = |file: &str| RawFinding {
+            scanner: "semgrep".to_string(),
+            rule_id: "python.security.eval".to_string(),
+            severity: "warning".to_string(),
+            file_path: file.to_string(),
+            line: 1,
+            message: "eval usage".to_string(),
+            matched_code: None,
+            suggested_replacement: None,
+        };
+
+        let findings = vec![make("src/a.py"), make("src/b.py")];
+        let descriptors: Vec<FixerDescriptorInfo> = vec![];
+        let issues = IssueBuilder::build_batch(&findings, std::path::Path::new("."), &descriptors);
+        assert_eq!(issues.len(), 2);
+        assert!(
+            issues.iter().all(|i| !i.cross_file),
+            "cross_file must be false when rule in < 3 files"
+        );
+    }
+
+    /// EVID-05 — build_batch() returns one issue per finding.
+    #[test]
+    fn build_batch_returns_all_issues() {
+        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        let findings: Vec<RawFinding> = (0..5)
+            .map(|i| RawFinding {
+                scanner: "semgrep".to_string(),
+                rule_id: format!("rule-{i}"),
+                severity: "warning".to_string(),
+                file_path: format!("src/file{i}.py"),
+                line: 1,
+                message: "test".to_string(),
+                matched_code: None,
+                suggested_replacement: None,
+            })
+            .collect();
+
+        let descriptors: Vec<FixerDescriptorInfo> = vec![];
+        let issues = IssueBuilder::build_batch(&findings, std::path::Path::new("."), &descriptors);
+        assert_eq!(
+            issues.len(),
+            5,
+            "build_batch must return one issue per finding"
+        );
+    }
+
+    /// EVID-05 — all issues from build_batch() have a non-empty priority_tier.
+    #[test]
+    fn priority_tier_set_by_build_batch() {
+        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        let findings: Vec<RawFinding> = (0..3)
+            .map(|i| RawFinding {
+                scanner: "clippy".to_string(),
+                rule_id: format!("clippy::rule-{i}"),
+                severity: "error".to_string(),
+                file_path: format!("src/lib{i}.rs"),
+                line: 1,
+                message: "test".to_string(),
+                matched_code: None,
+                suggested_replacement: None,
+            })
+            .collect();
+
+        let descriptors: Vec<FixerDescriptorInfo> = vec![];
+        let issues = IssueBuilder::build_batch(&findings, std::path::Path::new("."), &descriptors);
+        let valid_tiers = ["critical", "high", "medium", "low"];
+        for issue in &issues {
+            assert!(
+                valid_tiers.contains(&issue.priority_tier.as_str()),
+                "priority_tier must be a valid tier, got {:?}",
+                issue.priority_tier
+            );
+            assert!(
+                !issue.priority_tier.is_empty(),
+                "priority_tier must not be empty"
+            );
+        }
+    }
+
+    // ── EVID-05: Git churn combined file_freq ────────────────────────────────
+
+    /// EVID-05 — file_freq_with_churn() does not panic in a non-git dir.
+    #[test]
+    fn git_churn_graceful_fallback() {
+        use rice_guard_core::issue::file_freq_with_churn;
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        let findings = vec![RawFinding {
+            scanner: "semgrep".to_string(),
+            rule_id: "rule".to_string(),
+            severity: "warning".to_string(),
+            file_path: "src/app.py".to_string(),
+            line: 1,
+            message: "test".to_string(),
+            matched_code: None,
+            suggested_replacement: None,
+        }];
+        // Use a temp dir that is NOT a git repo.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let result = file_freq_with_churn(&findings, tmp.path());
+        assert!(
+            result.contains_key("src/app.py"),
+            "map must contain the file"
+        );
+        // Score must be ≥ 1 (issue count contribution) and ≤ 10.
+        let score = result["src/app.py"];
+        assert!(score >= 1 && score <= 10, "score out of range: {score}");
+    }
+
+    /// EVID-05 — combined score is capped at 10 even with high issue count and churn.
+    #[test]
+    fn git_churn_combined_score_capped_at_10() {
+        use rice_guard_core::issue::file_freq_with_churn;
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        // 20 findings in the same file → issue_norm = min(20, 5) = 5.
+        // Even if churn is very large, score must be capped at 10.
+        let findings: Vec<RawFinding> = (0..20)
+            .map(|i| RawFinding {
+                scanner: "semgrep".to_string(),
+                rule_id: format!("rule-{i}"),
+                severity: "warning".to_string(),
+                file_path: "src/hotspot.py".to_string(),
+                line: i + 1,
+                message: "test".to_string(),
+                matched_code: None,
+                suggested_replacement: None,
+            })
+            .collect();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let result = file_freq_with_churn(&findings, tmp.path());
+        let score = result["src/hotspot.py"];
+        assert!(score <= 10, "score must be capped at 10, got {score}");
+        assert!(score >= 1, "score must be positive, got {score}");
+    }
+
+    /// EVID-05 — file with 3 findings in a non-git dir returns score in 1..=5.
+    #[test]
+    fn file_freq_with_churn_basic() {
+        use rice_guard_core::issue::file_freq_with_churn;
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        let findings: Vec<RawFinding> = (0..3)
+            .map(|i| RawFinding {
+                scanner: "semgrep".to_string(),
+                rule_id: format!("rule-{i}"),
+                severity: "warning".to_string(),
+                file_path: "src/app.py".to_string(),
+                line: i + 1,
+                message: "test".to_string(),
+                matched_code: None,
+                suggested_replacement: None,
+            })
+            .collect();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let result = file_freq_with_churn(&findings, tmp.path());
+        let score = result["src/app.py"];
+        assert!(
+            (1..=5).contains(&score),
+            "3 findings in non-git dir must score between 1 and 5, got {score}"
+        );
+    }
+
+    /// EVID-05 — existing file_freq_map() still works correctly.
+    #[test]
+    fn file_freq_map_still_works() {
+        use rice_guard_core::issue::file_freq_map;
+        use rice_guard_core::scanner::parser::RawFinding;
+
+        let findings = vec![
+            RawFinding {
+                scanner: "semgrep".to_string(),
+                rule_id: "r".to_string(),
+                severity: "warning".to_string(),
+                file_path: "src/a.py".to_string(),
+                line: 1,
+                message: "t".to_string(),
+                matched_code: None,
+                suggested_replacement: None,
+            },
+            RawFinding {
+                scanner: "semgrep".to_string(),
+                rule_id: "r".to_string(),
+                severity: "warning".to_string(),
+                file_path: "src/a.py".to_string(),
+                line: 2,
+                message: "t".to_string(),
+                matched_code: None,
+                suggested_replacement: None,
+            },
+            RawFinding {
+                scanner: "semgrep".to_string(),
+                rule_id: "r".to_string(),
+                severity: "warning".to_string(),
+                file_path: "src/b.py".to_string(),
+                line: 1,
+                message: "t".to_string(),
+                matched_code: None,
+                suggested_replacement: None,
+            },
+        ];
+        let map = file_freq_map(&findings);
+        assert_eq!(map["src/a.py"], 2);
+        assert_eq!(map["src/b.py"], 1);
+    }
+
     // ── Compile-time: ScanSummary struct has required fields ─────────────────
 
     /// Verify ScanSummary has all required Phase 3 fields (compile-time check).

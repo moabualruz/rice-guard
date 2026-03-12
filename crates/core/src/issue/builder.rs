@@ -14,10 +14,12 @@
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+use std::collections::{HashMap, HashSet};
+
 use super::{
     evidence::extract_evidence_block,
-    fix_meta::FixMetadata,
-    priority::{priority_level, wsjf_score, PriorityLevel},
+    fix_meta::{FixMetadata, FixerDescriptorInfo},
+    priority::{file_freq_with_churn, priority_level, wsjf_score, PriorityLevel},
     verification::VerificationInfo,
     Issue,
 };
@@ -38,6 +40,117 @@ impl IssueBuilder {
             project_root,
         );
         Self::build_with_evidence(finding, evidence, file_freq)
+    }
+
+    /// Build a batch of [`Issue`]s from multiple findings, applying cross-file
+    /// penalty detection and git churn-enhanced file frequency scoring.
+    ///
+    /// ## Cross-file detection
+    ///
+    /// If the same `rule_id` appears in 3 or more distinct file paths,
+    /// `cross_file` is set to `true` on all affected issues and a -10
+    /// penalty is applied to their WSJF score.
+    ///
+    /// ## File frequency
+    ///
+    /// Calls [`file_freq_with_churn`] to combine issue density (0-5) and
+    /// git commit frequency (0-5) into a 0-10 score per file.
+    ///
+    /// ## Fix metadata
+    ///
+    /// Uses [`FixMetadata::from_finding_with_descriptors`] with the provided
+    /// fixer descriptors for descriptor-driven auto-fixable detection.
+    pub fn build_batch(
+        findings: &[RawFinding],
+        project_root: &Path,
+        fixer_descriptors: &[FixerDescriptorInfo],
+    ) -> Vec<Issue> {
+        // Step 1: compute file_freq with git churn.
+        let freq_map = file_freq_with_churn(findings, project_root);
+
+        // Step 2: count how many distinct files each rule_id appears in.
+        let mut rule_file_sets: HashMap<&str, HashSet<&str>> = HashMap::new();
+        for f in findings {
+            rule_file_sets
+                .entry(&f.rule_id)
+                .or_default()
+                .insert(&f.file_path);
+        }
+
+        // Step 3: build each issue.
+        findings
+            .iter()
+            .map(|f| {
+                let file_freq = freq_map.get(&f.file_path).copied().unwrap_or(1);
+                let file_ext = Path::new(&f.file_path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                let cross_file = rule_file_sets
+                    .get(f.rule_id.as_str())
+                    .map(|files| files.len() >= 3)
+                    .unwrap_or(false);
+
+                let fix = FixMetadata::from_finding_with_descriptors(
+                    &f.scanner,
+                    &f.rule_id,
+                    f.suggested_replacement.as_deref(),
+                    file_ext,
+                    fixer_descriptors,
+                );
+
+                let evidence = extract_evidence_block(
+                    f.matched_code.as_deref(),
+                    &f.file_path,
+                    f.line,
+                    project_root,
+                );
+
+                let verification = VerificationInfo::from_scanner(&f.scanner, &f.rule_id);
+
+                let score = wsjf_score(
+                    &f.severity,
+                    fix.auto_fixable,
+                    fix.auto_fix_category.as_deref(),
+                    file_freq,
+                    cross_file,
+                );
+
+                let priority_tier = match priority_level(score) {
+                    PriorityLevel::Critical => "critical",
+                    PriorityLevel::High => "high",
+                    PriorityLevel::Medium => "medium",
+                    PriorityLevel::Low => "low",
+                }
+                .to_string();
+
+                let id = fingerprint(
+                    &f.rule_id,
+                    &f.file_path,
+                    if evidence.matched_code.is_empty() {
+                        &f.message
+                    } else {
+                        &evidence.matched_code
+                    },
+                );
+
+                Issue {
+                    id,
+                    rule_id: f.rule_id.clone(),
+                    severity: f.severity.clone(),
+                    file_path: f.file_path.clone(),
+                    line: f.line,
+                    message: f.message.clone(),
+                    scanner: f.scanner.clone(),
+                    evidence,
+                    fix,
+                    verification,
+                    priority_score: score,
+                    priority_tier,
+                    cross_file,
+                }
+            })
+            .collect()
     }
 
     /// Construct an [`Issue`] using a pre-extracted [`EvidenceBlock`].

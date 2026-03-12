@@ -24,8 +24,10 @@ pub use builder::{fingerprint, IssueBuilder};
 pub use evidence::{
     extract_evidence_block, EvidenceBlock, EvidenceExtractor, LanguageNodeKinds, CONTEXT_LINES,
 };
-pub use fix_meta::{FixComplexity, FixMetadata};
-pub use priority::{file_freq_map, priority_level, sort_issues, wsjf_score, PriorityLevel};
+pub use fix_meta::{FixComplexity, FixMetadata, FixerDescriptorInfo};
+pub use priority::{
+    file_freq_map, file_freq_with_churn, priority_level, sort_issues, wsjf_score, PriorityLevel,
+};
 pub use verification::VerificationInfo;
 
 use serde::{Deserialize, Serialize};
