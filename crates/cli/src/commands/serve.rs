@@ -1,12 +1,13 @@
-/// Serve subcommand handler (stub — Phase 5).
+/// Serve subcommand handler — REST API server (Phase 5).
 use crate::args::ServeArgs;
-use crate::output;
 
 /// Run the serve subcommand.
 ///
-/// Phase 5 will implement the REST API + MCP server. Currently prints
-/// a "not yet implemented" warning and exits with code 0.
-pub async fn run(_args: ServeArgs) -> anyhow::Result<i32> {
-    output::print_warning("serve: not yet implemented (Phase 5)");
+/// Starts the REST API server on `127.0.0.1:{port}` with the current
+/// working directory as the default project root for all requests.
+pub async fn run(args: ServeArgs) -> anyhow::Result<i32> {
+    let working_dir = std::env::current_dir()
+        .map_err(|e| anyhow::anyhow!("Cannot determine working directory: {e}"))?;
+    rice_guard_server::rest::start_server(args.port, working_dir).await?;
     Ok(0)
 }

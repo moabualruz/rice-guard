@@ -39,6 +39,7 @@ pub enum Commands {
     Enroll(EnrollArgs),
     Report(ReportArgs),
     Version(VersionArgs),
+    Mcp(McpArgs),
 }
 
 /// Detect project languages, probe available tools, and generate `.riceguard.yaml`.
@@ -203,4 +204,11 @@ pub struct VersionArgs {
     /// Generate shell completion script for the given shell.
     #[arg(long, value_name = "SHELL")]
     pub completions: Option<Shell>,
+}
+
+/// Start the rice-guard MCP stdio server for Claude Code / Cursor integration.
+#[derive(Debug, clap::Args)]
+#[command(about = "Start the MCP stdio server (for Claude Code / Cursor)")]
+pub struct McpArgs {
+    // No args needed — reads working directory from current dir.
 }

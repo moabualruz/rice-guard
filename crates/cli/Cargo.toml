@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 rice-guard-core.workspace = true
+rice-guard-server.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
 inquire.workspace = true

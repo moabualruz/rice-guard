@@ -33,6 +33,7 @@ async fn main() {
             // version::run is sync — wrap in Ok to match async signature
             std::future::ready(commands::version::run(args)).await
         }
+        Commands::Mcp(args) => commands::mcp::run(args).await,
     };
 
     match result {

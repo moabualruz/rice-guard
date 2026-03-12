@@ -6,6 +6,7 @@
 pub mod enroll;
 pub mod fix;
 pub mod init;
+pub mod mcp;
 pub mod report;
 pub mod scan;
 pub mod serve;
