@@ -14,7 +14,10 @@ tokio.workspace = true
 axum.workspace = true
 tower-http.workspace = true
 rmcp.workspace = true
-schemars.workspace = true
+# schemars 1.x — use the version bundled by rmcp (rmcp 1.2 requires schemars 1.x).
+# The workspace pins schemars 0.8 for other crates; the server crate overrides to 1.x
+# because MCP tool parameter structs must satisfy rmcp::schemars::JsonSchema (1.x).
+schemars = "1"
 anyhow.workspace = true
 
 [dev-dependencies]
