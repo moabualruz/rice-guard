@@ -59,8 +59,7 @@ test-results/
 .gsd/
 adapters/
 docs/
-scripts/*.sh.bak
-# Note: scripts/ dir is tracked (install scripts)
+scripts/
 GSD-STYLE.md
 PROJECT_RULES.md
 model_capabilities.yaml
