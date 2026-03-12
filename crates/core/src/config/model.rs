@@ -184,6 +184,12 @@ pub struct SonarqubeConfig {
     pub enabled: bool,
     #[serde(default)]
     pub host: String,
+    /// SonarQube user token. Prefer `SONARQUBE_TOKEN` env var over storing here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    /// SonarQube project key. Auto-derived from directory name if absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_key: Option<String>,
 }
 
 // ── Fixers ───────────────────────────────────────────────────────────────────
