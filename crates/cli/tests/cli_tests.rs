@@ -392,6 +392,48 @@ fn sonar_report_quality_gate() {
     // and returns a parsed QualityGateStatus with a non-empty status string.
 }
 
+// ── Shell completion tests (Phase 7 — DIST-04) ──────────────────────────────
+
+#[test]
+fn completions_bash_generates_output() {
+    rice_guard()
+        .args(["version", "--completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not())
+        .stdout(predicate::str::contains("rice-guard"));
+}
+
+#[test]
+fn completions_zsh_generates_output() {
+    rice_guard()
+        .args(["version", "--completions", "zsh"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not())
+        .stdout(predicate::str::contains("rice-guard"));
+}
+
+#[test]
+fn completions_fish_generates_output() {
+    rice_guard()
+        .args(["version", "--completions", "fish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not())
+        .stdout(predicate::str::contains("complete"));
+}
+
+#[test]
+fn completions_powershell_generates_output() {
+    rice_guard()
+        .args(["version", "--completions", "powershell"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not())
+        .stdout(predicate::str::contains("Register-ArgumentCompleter"));
+}
+
 /// `fix <dir> --formatters --dry-run` exits 0 — verifies stage-filter flag is accepted.
 /// Covers FIX-03 (stage filter flags).
 #[test]
