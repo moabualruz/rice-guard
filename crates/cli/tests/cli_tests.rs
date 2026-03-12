@@ -5,6 +5,33 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use std::process::Command;
 
+// ── Test helpers ─────────────────────────────────────────────────────────────
+
+/// Write a minimal `.riceguard.yaml` into `dir` so that `fix` and `scan` can
+/// load a valid config without running `init` first.
+fn write_minimal_config(dir: &std::path::Path) {
+    let yaml = r#"version: "1"
+project:
+  name: test-project
+  languages:
+    - rust
+  topology: monolith
+  architecture: none
+scanners:
+  semgrep:
+    enabled: false
+  trivy:
+    enabled: false
+  gitleaks:
+    enabled: false
+  jscpd:
+    enabled: false
+  scc:
+    enabled: false
+"#;
+    std::fs::write(dir.join(".riceguard.yaml"), yaml).expect("failed to write test config");
+}
+
 // ── Additional integration tests (Plan 01-05) ────────────────────────────────
 
 /// `rice-guard scan --help` exits 0 (covers CLI-02 help discoverability).
@@ -204,4 +231,101 @@ fn serve_help_shows_port_flag() {
         .assert()
         .success()
         .stdout(predicate::str::contains("--port"));
+}
+
+// ── Fix subcommand integration tests (Phase 4 gate — FIX-01..FIX-11) ────────
+
+/// Verify that `fix --help` exposes all 11 user-visible flags.
+/// Covers FIX-03, FIX-06, FIX-07, FIX-10, FIX-11.
+#[test]
+fn fix_help_shows_all_flags() {
+    rice_guard()
+        .args(["fix", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--formatters"))
+        .stdout(predicate::str::contains("--linters"))
+        .stdout(predicate::str::contains("--security"))
+        .stdout(predicate::str::contains("--ast"))
+        .stdout(predicate::str::contains("--deps"))
+        .stdout(predicate::str::contains("--imports"))
+        .stdout(predicate::str::contains("--dry-run"))
+        .stdout(predicate::str::contains("--unsafe"))
+        .stdout(predicate::str::contains("--yes"))
+        .stdout(predicate::str::contains("--diff"))
+        .stdout(predicate::str::contains("--rescan"))
+        .stdout(predicate::str::contains("--timeout"));
+}
+
+/// `fix <dir> --dry-run` on an initialised directory exits 0.
+/// Covers FIX-06 exit-code contract: dry-run always exits 0.
+#[test]
+fn fix_dry_run_exits_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    write_minimal_config(dir.path());
+    rice_guard()
+        .args(["fix", dir.path().to_str().unwrap(), "--dry-run"])
+        .assert()
+        .code(0);
+}
+
+/// `fix <dir> --dry-run` writes a valid `fix-report.json` with `schema_version` and
+/// `dry_run: true`.  Covers FIX-08 (fix-report.json produced on every run).
+#[test]
+fn fix_dry_run_writes_report() {
+    let dir = tempfile::tempdir().unwrap();
+    write_minimal_config(dir.path());
+    rice_guard()
+        .args(["fix", dir.path().to_str().unwrap(), "--dry-run"])
+        .assert()
+        .code(0);
+
+    let latest = dir.path().join("reports").join("latest").join("fix-report.json");
+    assert!(latest.exists(), "fix-report.json must exist at reports/latest/");
+
+    let content = std::fs::read_to_string(&latest).expect("failed to read fix-report.json");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&content).expect("fix-report.json must be valid JSON");
+    assert_eq!(
+        parsed["schema_version"], "1.0",
+        "schema_version must be '1.0'"
+    );
+    assert_eq!(parsed["dry_run"], true, "dry_run field must be true");
+}
+
+/// `fix <dir> --unsafe` without `--yes` in a non-TTY environment exits 2.
+/// Covers FIX-07: CI safety gate for unsafe fixes.
+#[test]
+fn fix_unsafe_without_yes_non_tty_exits_two() {
+    let dir = tempfile::tempdir().unwrap();
+    write_minimal_config(dir.path());
+    // Pipe stdin to simulate non-TTY
+    let output = Command::cargo_bin("rice-guard")
+        .unwrap()
+        .args(["fix", dir.path().to_str().unwrap(), "--unsafe"])
+        .stdin(std::process::Stdio::piped())
+        .output()
+        .expect("failed to spawn rice-guard");
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "--unsafe without --yes in non-TTY must exit 2"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--yes") || stderr.contains("unsafe"),
+        "stderr must mention --yes or unsafe; got: {stderr}"
+    );
+}
+
+/// `fix <dir> --formatters --dry-run` exits 0 — verifies stage-filter flag is accepted.
+/// Covers FIX-03 (stage filter flags).
+#[test]
+fn fix_formatters_stage_filter() {
+    let dir = tempfile::tempdir().unwrap();
+    write_minimal_config(dir.path());
+    rice_guard()
+        .args(["fix", dir.path().to_str().unwrap(), "--formatters", "--dry-run"])
+        .assert()
+        .code(0);
 }
