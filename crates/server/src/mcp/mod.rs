@@ -57,6 +57,7 @@ pub async fn run_mcp_server(working_dir: PathBuf) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::server::RiceGuardMcpServer;
+    use super::tools::{FixAllParams, ScanProjectParams};
     use std::path::PathBuf;
 
     #[test]
@@ -64,6 +65,35 @@ mod tests {
         // RiceGuardMcpServer::new() must not panic or perform any I/O.
         // The ToolRouter is constructed in-memory only.
         let _server = RiceGuardMcpServer::new(PathBuf::from("."));
+    }
+
+    /// `ScanProjectParams` must deserialize correctly with `include_ignored: true`.
+    #[test]
+    fn scan_params_include_ignored_deserializes() {
+        let json = r#"{"path": "/some/project", "mode": "full", "include_ignored": true}"#;
+        let params: ScanProjectParams = serde_json::from_str(json)
+            .expect("ScanProjectParams must deserialize with include_ignored");
+        assert_eq!(params.path, "/some/project");
+        assert_eq!(params.include_ignored, Some(true));
+    }
+
+    /// `ScanProjectParams` defaults `include_ignored` to `None` when absent.
+    #[test]
+    fn scan_params_include_ignored_defaults_none() {
+        let json = r#"{"path": "/some/project"}"#;
+        let params: ScanProjectParams = serde_json::from_str(json)
+            .expect("ScanProjectParams must deserialize without include_ignored");
+        assert_eq!(params.include_ignored, None);
+    }
+
+    /// `FixAllParams` must deserialize correctly with `include_ignored: true`.
+    #[test]
+    fn fix_params_include_ignored_deserializes() {
+        let json = r#"{"path": "/some/project", "unsafe_fixes": false, "include_ignored": true}"#;
+        let params: FixAllParams =
+            serde_json::from_str(json).expect("FixAllParams must deserialize with include_ignored");
+        assert_eq!(params.include_ignored, Some(true));
+        assert!(!params.unsafe_fixes);
     }
 
     #[test]

@@ -388,4 +388,51 @@ scanners:
             "fix report must have stages"
         );
     }
+
+    /// `?include_ignored=true` in a scan request must be accepted without error.
+    #[tokio::test]
+    async fn scan_accepts_include_ignored_param() {
+        let dir = tempfile::tempdir().unwrap();
+        write_minimal_config(dir.path());
+
+        let app = build_router(test_state_with_dir(dir.path().to_path_buf()));
+        let body = serde_json::json!({
+            "path": dir.path().to_string_lossy(),
+            "mode": "full",
+            "include_ignored": true
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v1/scan")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        // Must not return 400 or 422 — the parameter is accepted.
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    /// `include_ignored: true` in a fix request must be accepted without error.
+    #[tokio::test]
+    async fn fix_accepts_include_ignored_param() {
+        let dir = tempfile::tempdir().unwrap();
+        write_minimal_config(dir.path());
+
+        let app = build_router(test_state_with_dir(dir.path().to_path_buf()));
+        let body = serde_json::json!({
+            "path": dir.path().to_string_lossy(),
+            "dry_run": true,
+            "include_ignored": true
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v1/fix")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
 }

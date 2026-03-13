@@ -11,6 +11,9 @@ pub struct ScanProjectParams {
     /// Scan mode: "full" | "quick" | "security". Default: "full".
     #[serde(default = "default_full")]
     pub mode: Option<String>,
+    /// When true, bypass ignore filtering (.rgignore / .gitignore). Default: false.
+    #[serde(default)]
+    pub include_ignored: Option<bool>,
 }
 
 /// Parameters for the `get_issues` tool.
@@ -46,6 +49,9 @@ pub struct FixAllParams {
     /// Include unsafe linter fixes. Default: false.
     #[serde(default)]
     pub unsafe_fixes: bool,
+    /// When true, bypass ignore filtering (.rgignore / .gitignore). Default: false.
+    #[serde(default)]
+    pub include_ignored: Option<bool>,
 }
 
 /// Parameters for the `fix_issue` tool.
