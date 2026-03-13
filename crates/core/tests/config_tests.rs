@@ -20,6 +20,7 @@ fn config_roundtrip() {
         filters: FiltersConfig {
             include: vec![],
             exclude: FiltersConfig::default_excludes(),
+            respect_gitignore: false,
         },
         ..Default::default()
     };
@@ -46,6 +47,7 @@ fn default_excludes_present_after_roundtrip() {
         filters: FiltersConfig {
             include: vec![],
             exclude: FiltersConfig::default_excludes(),
+            respect_gitignore: false,
         },
         ..Default::default()
     };
