@@ -58,12 +58,19 @@ pub enum ScannerRunError {
 /// | `Security`  | `descriptor.commands.security` or fallback to `scan`  |
 /// | `Full`      | `descriptor.commands.scan`                            |
 /// | `DiffOnly`  | `descriptor.commands.scan`                            |
+///
+/// # Extra args
+///
+/// `extra_args` are appended after the template-expanded command args before
+/// the subprocess is spawned. Used to pass tool-native exclude flags derived
+/// from the active ignore patterns (e.g. `--exclude vendor` for Semgrep).
 pub async fn run_one_scanner(
     descriptor: &ScannerDescriptor,
     config: &RiceGuardConfig,
     output_dir: &Path,
     target: &Path,
     mode: &ScanMode,
+    extra_args: &[String],
 ) -> Result<RawScanResult, ScannerRunError> {
     // ── Step 1: availability check ────────────────────────────────────────────
     let available = config
@@ -96,13 +103,17 @@ pub async fn run_one_scanner(
     let output_dir_str = output_dir.to_string_lossy();
     let target_str = target.to_string_lossy();
 
-    let args = build_command(
+    let mut args = build_command(
         &cmd.cmd,
         &[
             ("output_dir", output_dir_str.as_ref()),
             ("target", target_str.as_ref()),
         ],
     )?;
+
+    // Append tool-native exclude flags (e.g. --exclude vendor for semgrep)
+    // after template expansion so they don't interfere with placeholder substitution.
+    args.extend_from_slice(extra_args);
 
     tracing::debug!(scanner = %descriptor.name, ?args, "spawning scanner subprocess");
 

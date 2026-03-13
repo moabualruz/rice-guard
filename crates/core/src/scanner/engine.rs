@@ -5,6 +5,7 @@ use thiserror::Error;
 use tokio::task::JoinSet;
 
 use crate::config::RiceGuardConfig;
+use crate::ignore::ExcludeArgs;
 use crate::registry::ScannerDescriptor;
 
 use super::{
@@ -125,7 +126,11 @@ impl ScannerEngine {
             ScanMode::Full | ScanMode::DiffOnly => self.descriptors.iter().collect(),
         };
 
-        // ── Step 2: fan-out — spawn all selected scanners concurrently ────────
+        // ── Step 2: build exclude args from active ignore patterns ───────────
+        let patterns = ExcludeArgs::collect_active_patterns(&self.config);
+        let exclude_args = ExcludeArgs::from_patterns(&patterns);
+
+        // ── Step 3: fan-out — spawn all selected scanners concurrently ────────
         let mut set: JoinSet<Result<(String, Vec<RawFinding>), ScannerRunError>> = JoinSet::new();
 
         for descriptor in selected {
@@ -135,8 +140,19 @@ impl ScannerEngine {
             let tgt = target.to_path_buf();
             let m = mode;
 
+            // Select the correct per-tool exclude flags based on scanner name.
+            let tool_extra_args: Vec<String> = match desc.name.to_lowercase().as_str() {
+                "semgrep" => exclude_args.semgrep.clone(),
+                "trivy" => exclude_args.trivy.clone(),
+                "jscpd" => exclude_args.jscpd.clone(),
+                "scc" => exclude_args.scc.clone(),
+                // Gitleaks uses fingerprint-based ignoring (.gitleaksignore), not CLI flags.
+                // Other scanners: no native exclude flags supported.
+                _ => vec![],
+            };
+
             set.spawn(async move {
-                let raw = run_one_scanner(&desc, &cfg, &out, &tgt, &m).await?;
+                let raw = run_one_scanner(&desc, &cfg, &out, &tgt, &m, &tool_extra_args).await?;
                 let findings =
                     parse_scanner_output(&raw).map_err(|e| ScannerRunError::SpawnFailed {
                         scanner: raw.scanner.clone(),
@@ -146,7 +162,7 @@ impl ScannerEngine {
             });
         }
 
-        // ── Step 3: collect results, track per-scanner outcomes ──────────────
+        // ── Step 4: collect results, track per-scanner outcomes ──────────────
         let mut all_findings: Vec<RawFinding> = Vec::new();
         let mut succeeded: HashSet<String> = HashSet::new();
         let mut failed: Vec<(String, String)> = Vec::new();
@@ -183,7 +199,7 @@ impl ScannerEngine {
             }
         }
 
-        // ── Step 4: DiffOnly post-filter ──────────────────────────────────────
+        // ── Step 5: DiffOnly post-filter ──────────────────────────────────────
         if mode == ScanMode::DiffOnly {
             match diff_only_filter(target).await {
                 Ok(changed_files) if !changed_files.is_empty() => {
