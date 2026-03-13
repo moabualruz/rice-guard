@@ -19,6 +19,8 @@ pub struct WizardChoices {
     pub quality_checks: Vec<String>,
     pub pre_commit: bool,
     pub ci_provider: CiProvider,
+    /// Whether to respect `.gitignore` patterns when scanning. Default: false.
+    pub respect_gitignore: bool,
 }
 
 /// Run the interactive init wizard.
@@ -114,12 +116,26 @@ pub fn wizard(_detected: &DetectionResult) -> Result<WizardChoices, InitError> {
         _ => CiProvider::None,
     };
 
+    // Respect .gitignore
+    let respect_gitignore = inquire::Confirm::new(
+        "Respect .gitignore patterns? (excludes gitignored files from scanning)",
+    )
+    .with_default(false)
+    .prompt()
+    .map_err(|e| match e {
+        inquire::InquireError::NotTTY => InitError::NotInteractive {
+            hint: "Use --yes for non-interactive mode".to_string(),
+        },
+        other => InitError::WizardFailed(other.to_string()),
+    })?;
+
     Ok(WizardChoices {
         topology,
         architecture,
         quality_checks,
         pre_commit,
         ci_provider,
+        respect_gitignore,
     })
 }
 
@@ -134,6 +150,7 @@ pub fn noninteractive_choices(_detected: &DetectionResult) -> WizardChoices {
         quality_checks: vec!["security".into(), "cve".into(), "secrets".into()],
         pre_commit: false,
         ci_provider: CiProvider::None,
+        respect_gitignore: false,
     }
 }
 
@@ -200,5 +217,9 @@ mod tests {
             "pre-commit must be disabled by default"
         );
         assert_eq!(choices.ci_provider, CiProvider::None);
+        assert!(
+            !choices.respect_gitignore,
+            "respect_gitignore must be false by default"
+        );
     }
 }

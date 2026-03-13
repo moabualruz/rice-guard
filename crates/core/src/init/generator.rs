@@ -32,6 +32,28 @@ const TMPL_GITLAB_CI: &str = include_str!("../../../../templates/gitlab-ci.yml.t
 const TMPL_SEMGREP_ARCH: &str =
     include_str!("../../../../templates/semgrep/architecture.yaml.tmpl");
 
+/// Starter content for a new `.rgignore` file.
+///
+/// Uses gitignore-compatible syntax. Generated once; not overwritten if the
+/// file already exists so users can customise it freely.
+const STARTER_RGIGNORE: &str = "# rice-guard ignore file - gitignore-compatible syntax\n\
+# Full docs: https://git-scm.com/docs/gitignore\n\
+\n\
+# Build artifacts\n\
+node_modules/\n\
+vendor/\n\
+target/\n\
+dist/\n\
+build/\n\
+.git/\n\
+\n\
+# Generated files\n\
+*.generated.*\n\
+*.pb.go\n\
+*_generated.go\n\
+*.min.js\n\
+*.min.css\n";
+
 /// ast-grep patterns template.
 const TMPL_AST_GREP: &str = include_str!("../../../../templates/ast-grep/patterns.yaml.tmpl");
 
@@ -79,6 +101,13 @@ pub async fn generate(input: &GeneratorInput) -> Result<Vec<PathBuf>, InitError>
     let config_path = input.project_path.join(".riceguard.yaml");
     write_file(&config_path, &config_yaml)?;
     created.push(normalize_path(&config_path));
+
+    // ── Write starter .rgignore (only if not already present) ────────────────
+    let rgignore_path = input.project_path.join(".rgignore");
+    if !rgignore_path.exists() {
+        write_file(&rgignore_path, STARTER_RGIGNORE)?;
+        created.push(normalize_path(&rgignore_path));
+    }
 
     // ── lefthook.yml ─────────────────────────────────────────────────────────
     if input.choices.pre_commit {
@@ -234,7 +263,7 @@ fn build_config(input: &GeneratorInput) -> RiceGuardConfig {
         filters: FiltersConfig {
             include: vec![],
             exclude: FiltersConfig::default_excludes(),
-            respect_gitignore: false,
+            respect_gitignore: input.choices.respect_gitignore,
         },
         tools: ToolsConfig {
             scanners: tools_scanners,
@@ -338,6 +367,7 @@ mod tests {
             quality_checks: vec!["security".into(), "cve".into(), "secrets".into()],
             pre_commit: false,
             ci_provider: CiProvider::None,
+            respect_gitignore: false,
         };
 
         GeneratorInput {
@@ -463,5 +493,79 @@ mod tests {
             let s = path.to_string_lossy();
             assert!(!s.contains('\\'), "path must not contain backslashes: {s}");
         }
+    }
+
+    /// `generate()` creates a starter `.rgignore` file when none exists.
+    #[tokio::test]
+    async fn rgignore_created_on_fresh_init() {
+        let tmp = TempDir::new().unwrap();
+        let input = make_input(&tmp);
+
+        let created = generate(&input).await.expect("generate must succeed");
+
+        let rgignore_path = tmp.path().join(".rgignore");
+        assert!(rgignore_path.exists(), ".rgignore must be written to disk");
+
+        let content = std::fs::read_to_string(&rgignore_path).expect(".rgignore must be readable");
+        assert!(
+            content.contains("node_modules/"),
+            ".rgignore must contain node_modules/"
+        );
+        assert!(
+            content.contains("target/"),
+            ".rgignore must contain target/"
+        );
+        assert!(
+            created
+                .iter()
+                .any(|p| p.to_string_lossy().ends_with(".rgignore")),
+            ".rgignore must appear in created files list"
+        );
+    }
+
+    /// `generate()` must NOT overwrite an existing `.rgignore`.
+    #[tokio::test]
+    async fn rgignore_not_overwritten_if_exists() {
+        let tmp = TempDir::new().unwrap();
+        let input = make_input(&tmp);
+
+        // Write a custom .rgignore before running generate.
+        let rgignore_path = tmp.path().join(".rgignore");
+        let custom_content = "# my custom ignore file\ncustom_dir/\n";
+        std::fs::write(&rgignore_path, custom_content).unwrap();
+
+        let created = generate(&input).await.expect("generate must succeed");
+
+        // File content must be unchanged.
+        let content = std::fs::read_to_string(&rgignore_path).expect(".rgignore must be readable");
+        assert_eq!(
+            content, custom_content,
+            ".rgignore must not be overwritten when it already exists"
+        );
+
+        // The existing .rgignore must NOT appear in the created files list.
+        assert!(
+            !created
+                .iter()
+                .any(|p| p.to_string_lossy().ends_with(".rgignore")),
+            ".rgignore must not appear in created list when it already existed"
+        );
+    }
+
+    /// When `respect_gitignore == true`, the generated config must reflect that.
+    #[tokio::test]
+    async fn respect_gitignore_from_choices() {
+        let tmp = TempDir::new().unwrap();
+        let mut input = make_input(&tmp);
+        input.choices.respect_gitignore = true;
+
+        generate(&input).await.expect("generate must succeed");
+
+        let yaml = std::fs::read_to_string(tmp.path().join(".riceguard.yaml")).unwrap();
+        let config: RiceGuardConfig = serde_yaml_ng::from_str(&yaml).unwrap();
+        assert!(
+            config.filters.respect_gitignore,
+            "filters.respect_gitignore must be true when wizard selected it"
+        );
     }
 }
