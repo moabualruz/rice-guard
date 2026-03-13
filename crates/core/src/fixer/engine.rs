@@ -68,6 +68,7 @@ impl FixerEngine {
                     file_targets: engine_config.file_targets.clone(),
                     dry_run: engine_config.dry_run,
                     timeout_secs: Some(engine_config.timeout_secs.unwrap_or(120)),
+                    extra_args: vec![],
                 };
                 let mut result = run_one_fixer(step, &runner_cfg).await;
                 result.language = language.clone();

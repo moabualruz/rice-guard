@@ -21,6 +21,11 @@ pub struct RunnerConfig {
     pub dry_run: bool,
     /// Per-tool timeout in seconds. `None` means no timeout (run until done).
     pub timeout_secs: Option<u64>,
+    /// Additional CLI arguments appended to both check and fix commands.
+    ///
+    /// Used to pass tool-native exclude flags derived from active ignore patterns.
+    /// Mirrors the `extra_args` pattern from `scanner/runner.rs`.
+    pub extra_args: Vec<String>,
 }
 
 /// Execute a single fixer tool using the check → (dry-run?) → fix → verify cycle.
@@ -33,7 +38,7 @@ pub async fn run_one_fixer(step: &FixerStep, config: &RunnerConfig) -> FixToolRe
 
     // ── Step 1: build check command args ─────────────────────────────────────
     let files_str = build_files_arg(&config.file_targets, &config.project_root);
-    let check_args = match build_command(&step.check, &[("files", &files_str)]) {
+    let mut check_args = match build_command(&step.check, &[("files", &files_str)]) {
         Ok(a) => a,
         Err(e) => {
             return FixToolResult {
@@ -46,6 +51,7 @@ pub async fn run_one_fixer(step: &FixerStep, config: &RunnerConfig) -> FixToolRe
             };
         }
     };
+    check_args.extend_from_slice(&config.extra_args);
 
     // ── Step 2: run check ─────────────────────────────────────────────────────
     let check_exit = run_command(&check_args, &config.project_root, config.timeout_secs).await;
@@ -105,7 +111,7 @@ pub async fn run_one_fixer(step: &FixerStep, config: &RunnerConfig) -> FixToolRe
     let before = snapshot_mtimes(&config.project_root);
 
     // ── Step 5: build fix command args ────────────────────────────────────────
-    let fix_args = match build_command(&step.fix, &[("files", &files_str)]) {
+    let mut fix_args = match build_command(&step.fix, &[("files", &files_str)]) {
         Ok(a) => a,
         Err(e) => {
             return FixToolResult {
@@ -118,6 +124,7 @@ pub async fn run_one_fixer(step: &FixerStep, config: &RunnerConfig) -> FixToolRe
             };
         }
     };
+    fix_args.extend_from_slice(&config.extra_args);
 
     // ── Step 6: run fix ───────────────────────────────────────────────────────
     let fix_exit = run_command(&fix_args, &config.project_root, config.timeout_secs).await;
@@ -364,6 +371,7 @@ mod tests {
             file_targets: vec![],
             dry_run: false,
             timeout_secs: None,
+            extra_args: vec![],
         };
 
         let result = run_one_fixer(&step, &cfg).await;
@@ -389,6 +397,7 @@ mod tests {
             file_targets: vec![],
             dry_run: true,
             timeout_secs: None,
+            extra_args: vec![],
         };
 
         let result = run_one_fixer(&step, &cfg).await;
@@ -416,6 +425,7 @@ mod tests {
             file_targets: vec![],
             dry_run: false,
             timeout_secs: None,
+            extra_args: vec![],
         };
 
         let result = run_one_fixer(&step, &cfg).await;
@@ -461,6 +471,7 @@ mod tests {
             file_targets: vec![target_file.clone()],
             dry_run: false,
             timeout_secs: None,
+            extra_args: vec![],
         };
 
         let result = run_one_fixer(&step, &cfg).await;
