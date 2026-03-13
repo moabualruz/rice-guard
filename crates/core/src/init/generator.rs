@@ -234,6 +234,7 @@ fn build_config(input: &GeneratorInput) -> RiceGuardConfig {
         filters: FiltersConfig {
             include: vec![],
             exclude: FiltersConfig::default_excludes(),
+            respect_gitignore: false,
         },
         tools: ToolsConfig {
             scanners: tools_scanners,

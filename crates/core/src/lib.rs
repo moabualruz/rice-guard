@@ -1,6 +1,7 @@
 pub mod config;
 pub mod errors;
 pub mod fixer;
+pub mod ignore;
 pub mod init;
 pub mod issue;
 pub mod output;

@@ -153,7 +153,7 @@ fn sanitize_json_surrogates(input: &str) -> String {
                     let has_low = i + 11 < len
                         && bytes[i + 6] == b'\\'
                         && bytes[i + 7] == b'u'
-                        && hex4(bytes, i + 8).map_or(false, |low| (0xDC00..=0xDFFF).contains(&low));
+                        && hex4(bytes, i + 8).is_some_and(|low| (0xDC00..=0xDFFF).contains(&low));
                     if has_low {
                         i += 12;
                         continue;

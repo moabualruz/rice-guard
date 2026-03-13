@@ -245,6 +245,14 @@ pub struct FiltersConfig {
     /// Example: `["vendor/", "node_modules/", "*.generated.*"]`
     #[serde(default)]
     pub exclude: Vec<String>,
+
+    /// When `true`, patterns from `.gitignore` are loaded into the ignore engine
+    /// in addition to `.riceguardignore` / `.rgignore`.
+    ///
+    /// Defaults to `false` — rice-guard has its own ignore files and should not
+    /// silently inherit git's exclusions unless the user opts in.
+    #[serde(default)]
+    pub respect_gitignore: bool,
 }
 
 impl FiltersConfig {
@@ -381,6 +389,7 @@ mod tests {
             filters: FiltersConfig {
                 include: vec![],
                 exclude: FiltersConfig::default_excludes(),
+                respect_gitignore: false,
             },
             tools: ToolsConfig::default(),
             output: OutputConfig::default(),
@@ -450,6 +459,39 @@ mod tests {
             serde_yaml_ng::from_str(&yaml).expect("deserialize from YAML");
         assert_eq!(config.filters.exclude, restored.filters.exclude);
         assert_eq!(config.filters.include, restored.filters.include);
+    }
+
+    #[test]
+    fn respect_gitignore_defaults_to_false() {
+        let config = minimal_config();
+        assert!(
+            !config.filters.respect_gitignore,
+            "respect_gitignore should default to false"
+        );
+    }
+
+    #[test]
+    fn respect_gitignore_roundtrips_through_yaml() {
+        let mut config = minimal_config();
+        config.filters.respect_gitignore = true;
+        let yaml = serde_yaml_ng::to_string(&config).expect("serialize to YAML");
+        let restored: RiceGuardConfig =
+            serde_yaml_ng::from_str(&yaml).expect("deserialize from YAML");
+        assert!(
+            restored.filters.respect_gitignore,
+            "respect_gitignore=true should survive YAML round-trip"
+        );
+
+        // Also test false round-trips correctly
+        let mut config2 = minimal_config();
+        config2.filters.respect_gitignore = false;
+        let yaml2 = serde_yaml_ng::to_string(&config2).expect("serialize to YAML");
+        let restored2: RiceGuardConfig =
+            serde_yaml_ng::from_str(&yaml2).expect("deserialize from YAML");
+        assert!(
+            !restored2.filters.respect_gitignore,
+            "respect_gitignore=false should survive YAML round-trip"
+        );
     }
 
     #[test]

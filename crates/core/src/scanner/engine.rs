@@ -163,7 +163,7 @@ impl ScannerEngine {
                     unavailable.push(name);
                 }
                 Ok(Err(ScannerRunError::Timeout(name))) => {
-                    let msg = format!("timed out");
+                    let msg = "timed out".to_string();
                     tracing::warn!("scanner {} {} — skipping", name, msg);
                     failed.push((name, msg));
                 }
