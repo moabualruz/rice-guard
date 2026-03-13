@@ -8,7 +8,7 @@ const path = require("path");
 const https = require("https");
 const http = require("http");
 
-const REPO = "rice-guard/rguard"; // TODO: update to real GitHub owner
+const REPO = "moabualruz/rice-guard"; // TODO: update to real GitHub owner
 const VERSION = require("./package.json").version;
 const BIN_DIR = path.join(__dirname, "bin");
 

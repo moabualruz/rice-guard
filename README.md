@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://github.com/rice-guard/rguard">
-    <img src="https://raw.githubusercontent.com/rice-guard/rguard/main/.branding/banner.png" alt="riceGuard" width="500" />
+  <a href="https://github.com/moabualruz/rice-guard">
+    <img src="https://raw.githubusercontent.com/moabualruz/rice-guard/main/.branding/banner.png" alt="riceGuard" width="500" />
   </a>
 </p>
 
@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rice-guard/rguard/actions"><img src="https://img.shields.io/github/actions/workflow/status/rice-guard/rguard/ci.yml?branch=main&style=flat-square&label=CI" alt="CI Status" /></a>
+  <a href="https://github.com/moabualruz/rice-guard/actions"><img src="https://img.shields.io/github/actions/workflow/status/moabualruz/rice-guard/ci.yml?branch=main&style=flat-square&label=CI" alt="CI Status" /></a>
   <a href="https://crates.io/crates/rguard"><img src="https://img.shields.io/crates/v/rguard?style=flat-square&color=00a020" alt="Crates.io" /></a>
-  <a href="https://github.com/rice-guard/rguard/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-00a020?style=flat-square" alt="License" /></a>
-  <a href="https://github.com/rice-guard/rguard/releases"><img src="https://img.shields.io/github/v/release/rice-guard/rguard?style=flat-square&color=00a020" alt="Latest Release" /></a>
+  <a href="https://github.com/moabualruz/rice-guard/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-00a020?style=flat-square" alt="License" /></a>
+  <a href="https://github.com/moabualruz/rice-guard/releases"><img src="https://img.shields.io/github/v/release/moabualruz/rice-guard?style=flat-square&color=00a020" alt="Latest Release" /></a>
 </p>
 
 ---
@@ -63,7 +63,7 @@ rguard status .
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/rice-guard/rguard/main/.branding/logo.png" alt="rG" width="80" />
+  <img src="https://raw.githubusercontent.com/moabualruz/rice-guard/main/.branding/logo.png" alt="rG" width="80" />
 </p>
 
 ## Installation
@@ -106,7 +106,7 @@ irm https://install.rguard.dev/windows | iex
 
 ### Pre-built Binaries
 
-Download from [GitHub Releases](https://github.com/rice-guard/rguard/releases) — available for Linux, macOS, and Windows on x64 and ARM64.
+Download from [GitHub Releases](https://github.com/moabualruz/rice-guard/releases) — available for Linux, macOS, and Windows on x64 and ARM64.
 
 ## How It Works
 
@@ -341,8 +341,8 @@ cargo clippy -- -D warnings        # Lint (must pass clean)
 
 <p align="center">
   <br />
-  <a href="https://github.com/rice-guard/rguard">
-    <img src="https://raw.githubusercontent.com/rice-guard/rguard/main/.branding/mini.logo.png" alt="rG" width="40" />
+  <a href="https://github.com/moabualruz/rice-guard">
+    <img src="https://raw.githubusercontent.com/moabualruz/rice-guard/main/.branding/mini.logo.png" alt="rG" width="40" />
   </a>
   <br />
   <sub>Built with Rust. Zero AI in the fix pipeline.</sub>

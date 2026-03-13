@@ -1,7 +1,7 @@
 # rguard installer for Windows — downloads the x86_64-pc-windows-msvc binary.
 $ErrorActionPreference = "Stop"
 
-$Repo = "rice-guard/rguard"  # TODO: update to real GitHub owner
+$Repo = "moabualruz/rice-guard"  # TODO: update to real GitHub owner
 $Version = if ($env:RGUARD_VERSION) { $env:RGUARD_VERSION } else { "latest" }
 $InstallDir = if ($env:RGUARD_INSTALL_DIR) { $env:RGUARD_INSTALL_DIR } else { "$env:LOCALAPPDATA\rguard" }
 $Target = "x86_64-pc-windows-msvc"

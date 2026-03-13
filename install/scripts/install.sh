@@ -2,7 +2,7 @@
 # rguard installer — detects OS/arch and downloads the correct binary.
 set -euo pipefail
 
-REPO="rice-guard/rguard"  # TODO: update to real GitHub owner
+REPO="moabualruz/rice-guard"  # TODO: update to real GitHub owner
 VERSION="${RGUARD_VERSION:-latest}"
 INSTALL_DIR="${RGUARD_INSTALL_DIR:-$HOME/.local/bin}"
 
