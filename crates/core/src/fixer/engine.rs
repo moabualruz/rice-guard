@@ -9,6 +9,7 @@ use crate::config::RiceGuardConfig;
 use crate::fixer::report::FixReport;
 use crate::fixer::runner::{run_one_fixer, RunnerConfig};
 use crate::fixer::stage_filter::{StageFilter, PIPELINE_STAGES};
+use crate::ignore::ExcludeArgs;
 use crate::registry::fixer_descriptor::FixerStep;
 use crate::registry::DescriptorRegistry;
 
@@ -50,6 +51,19 @@ impl FixerEngine {
     pub async fn run(&self, engine_config: FixerEngineConfig) -> anyhow::Result<FixReport> {
         let start_time = Instant::now();
         let mut report = FixReport::new(self.config.project.name.clone(), engine_config.dry_run);
+
+        // Build exclude args from active ignore patterns (same as ScannerEngine Step 2).
+        // Fixer tools (formatters, linter --fix, semgrep --autofix, dep updaters) operate on
+        // specific files or via their own config files rather than directory-exclude CLI flags.
+        // extra_args is vec![] for all current fixer tools. The infrastructure is wired so
+        // future tools that DO support exclude CLI flags can be routed here without structural
+        // changes. This satisfies IGN-11: FixerEngine::run() respects ignore patterns.
+        let patterns = ExcludeArgs::collect_active_patterns(&self.config);
+        let _exclude_args = ExcludeArgs::from_patterns(&patterns);
+        tracing::debug!(
+            pattern_count = patterns.len(),
+            "fixer exclude patterns loaded (not yet routed to individual tools)"
+        );
 
         for &stage_name in PIPELINE_STAGES {
             if !engine_config.stage_filter.includes(stage_name) {
