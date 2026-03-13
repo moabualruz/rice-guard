@@ -19,6 +19,7 @@ indicatif.workspace = true
 owo-colors.workspace = true
 atty.workspace = true
 anyhow.workspace = true
+walkdir.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio.workspace = true

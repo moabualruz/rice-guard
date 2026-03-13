@@ -86,6 +86,18 @@ pub struct ScanArgs {
     /// Hold-the-line mode: report new issues only (compared to baseline).
     #[arg(long)]
     pub diff_only: bool,
+
+    /// Respect .gitignore patterns when scanning (overrides config value).
+    #[arg(long)]
+    pub respect_gitignore: bool,
+
+    /// Do not respect .gitignore patterns (overrides config value).
+    #[arg(long, conflicts_with = "respect_gitignore")]
+    pub no_gitignore: bool,
+
+    /// Print which rule excluded or included each file and its source to stderr.
+    #[arg(long)]
+    pub debug_ignores: bool,
 }
 
 /// Run deterministic fixers: formatters, linters, security patches, dep updates.
@@ -155,6 +167,14 @@ pub struct FixArgs {
     /// Skip the --unsafe confirmation prompt (for CI pipelines; use with --unsafe).
     #[arg(long)]
     pub yes: bool,
+
+    /// Respect .gitignore patterns when fixing (overrides config value).
+    #[arg(long)]
+    pub respect_gitignore: bool,
+
+    /// Do not respect .gitignore patterns (overrides config value).
+    #[arg(long, conflicts_with = "respect_gitignore")]
+    pub no_gitignore: bool,
 
     /// Additional file targets (when given, only these files are fixed instead of entire project).
     #[arg(trailing_var_arg = true)]

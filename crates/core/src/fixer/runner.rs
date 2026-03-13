@@ -212,14 +212,52 @@ fn build_files_arg(file_targets: &[PathBuf], project_root: &Path) -> String {
     }
 }
 
+/// Directories to skip when walking the project tree for mtime snapshots.
+/// These are large generated/vendored directories that fixers never modify.
+const SKIP_DIRS: &[&str] = &[
+    ".git",
+    ".dart_tool",
+    ".flutter-plugins-dependencies",
+    "build",
+    "node_modules",
+    ".gradle",
+    ".idea",
+    ".vs",
+    ".vscode",
+    "target",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    "dist",
+    "vendor",
+    ".next",
+    "reports",
+];
+
+/// Check if a walkdir entry is inside a skipped directory.
+fn should_skip_dir(entry: &walkdir::DirEntry) -> bool {
+    if entry.file_type().is_dir() {
+        if let Some(name) = entry.file_name().to_str() {
+            return SKIP_DIRS.contains(&name);
+        }
+    }
+    false
+}
+
 /// Snapshot the last-modified timestamps of all files under `dir`.
+///
+/// Skips large generated directories (build/, node_modules/, .git/, etc.)
+/// to avoid multi-minute walks on large monorepos.
 fn snapshot_mtimes(dir: &Path) -> HashMap<PathBuf, SystemTime> {
     let mut map = HashMap::new();
-    for entry in walkdir::WalkDir::new(dir)
-        .into_iter()
+    let walker = walkdir::WalkDir::new(dir).into_iter();
+    for entry in walker
+        .filter_entry(|e| !should_skip_dir(e))
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
     {
+        if !entry.file_type().is_file() {
+            continue;
+        }
         if let Ok(meta) = entry.metadata() {
             if let Ok(mtime) = meta.modified() {
                 map.insert(entry.path().to_path_buf(), mtime);
@@ -232,17 +270,21 @@ fn snapshot_mtimes(dir: &Path) -> HashMap<PathBuf, SystemTime> {
 /// Return paths of files whose mtime changed (or that are new) since `before`.
 ///
 /// Paths are normalised to forward slashes for cross-platform consistency.
+/// Skips the same large directories as `snapshot_mtimes`.
 fn changed_files(before: &HashMap<PathBuf, SystemTime>, dir: &Path) -> Vec<String> {
     let mut changed = Vec::new();
-    for entry in walkdir::WalkDir::new(dir)
-        .into_iter()
+    let walker = walkdir::WalkDir::new(dir).into_iter();
+    for entry in walker
+        .filter_entry(|e| !should_skip_dir(e))
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
     {
+        if !entry.file_type().is_file() {
+            continue;
+        }
         let path = entry.path().to_path_buf();
         if let Ok(meta) = entry.metadata() {
             if let Ok(mtime) = meta.modified() {
-                let was_modified = before.get(&path).map(|old| *old != mtime).unwrap_or(true); // new file
+                let was_modified = before.get(&path).map(|old| *old != mtime).unwrap_or(true);
                 if was_modified {
                     changed.push(path.to_string_lossy().replace('\\', "/"));
                 }

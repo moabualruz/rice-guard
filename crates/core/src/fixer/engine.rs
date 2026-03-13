@@ -24,7 +24,7 @@ pub struct FixerEngineConfig {
     pub dry_run: bool,
     /// When true, also run tools marked `safe: false`.
     pub include_unsafe: bool,
-    /// Optional per-tool timeout in seconds. `None` means no timeout.
+    /// Per-tool timeout in seconds. `None` uses the default (120s).
     pub timeout_secs: Option<u64>,
     /// Archive directory for this fix run (timestamped).
     pub output_dir: std::path::PathBuf,
@@ -67,7 +67,7 @@ impl FixerEngine {
                     project_root: engine_config.project_root.clone(),
                     file_targets: engine_config.file_targets.clone(),
                     dry_run: engine_config.dry_run,
-                    timeout_secs: engine_config.timeout_secs,
+                    timeout_secs: Some(engine_config.timeout_secs.unwrap_or(120)),
                 };
                 let mut result = run_one_fixer(step, &runner_cfg).await;
                 result.language = language.clone();

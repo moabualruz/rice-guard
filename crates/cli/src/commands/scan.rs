@@ -7,6 +7,26 @@ use crate::terminal::{
     print_scan_summary_table, ScanProgressReporter, ScannerResult, ScannerStatus,
 };
 
+/// Resolve the effective `respect_gitignore` value from CLI flags and config.
+///
+/// CLI flags override the config value:
+/// - `--respect-gitignore` forces `true`
+/// - `--no-gitignore` forces `false`
+/// - Neither flag → use `config.filters.respect_gitignore`
+fn resolve_respect_gitignore(
+    cli_respect: bool,
+    cli_no_gitignore: bool,
+    config_value: bool,
+) -> bool {
+    if cli_respect {
+        true
+    } else if cli_no_gitignore {
+        false
+    } else {
+        config_value
+    }
+}
+
 /// Run the scan subcommand.
 ///
 /// Exit codes:
@@ -34,7 +54,47 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
         }
     };
 
-    // ── Step 3: load scanner descriptors ─────────────────────────────────────
+    // ── Step 3: resolve respect_gitignore and run --debug-ignores if requested ─
+    let respect_gitignore = resolve_respect_gitignore(
+        args.respect_gitignore,
+        args.no_gitignore,
+        config.filters.respect_gitignore,
+    );
+
+    if args.debug_ignores {
+        use rice_guard_core::ignore::IgnoreEngine;
+        use walkdir::WalkDir;
+
+        match IgnoreEngine::build(&target, &config, respect_gitignore) {
+            Ok(engine) => {
+                let walker = WalkDir::new(&target).into_iter();
+                for entry in walker.filter_map(|e| e.ok()) {
+                    let path = entry.path();
+                    let is_dir = entry.file_type().is_dir();
+                    let rel = path
+                        .strip_prefix(&target)
+                        .unwrap_or(path)
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    if rel.is_empty() {
+                        continue;
+                    }
+                    if engine.is_ignored(path, is_dir) {
+                        eprintln!("[IGNORED] {rel}");
+                    } else {
+                        eprintln!("[INCLUDED] {rel}");
+                    }
+                }
+            }
+            Err(e) => {
+                output::print_warning(&format!(
+                    "--debug-ignores: failed to build ignore engine: {e}"
+                ));
+            }
+        }
+    }
+
+    // ── Step 4: load scanner descriptors ─────────────────────────────────────
     let descriptors = match rice_guard_core::registry::loader::load_scanner_descriptors(&target) {
         Ok(d) => d,
         Err(e) => {

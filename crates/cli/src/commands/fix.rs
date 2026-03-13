@@ -72,6 +72,9 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
                 quick: false,
                 security: false,
                 diff_only: false,
+                respect_gitignore: args.respect_gitignore,
+                no_gitignore: args.no_gitignore,
+                debug_ignores: false,
             };
             let scan_exit = crate::commands::scan::run(scan_args).await?;
             if scan_exit == 2 {
