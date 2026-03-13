@@ -1,15 +1,15 @@
 /// Integration tests for config model round-trips.
 ///
-/// These tests exercise the public serde interface of `rice_guard_core::config`.
-use rice_guard_core::config::model::{
-    Architecture, FiltersConfig, ProjectConfig, RiceGuardConfig, SonarqubeConfig, Topology,
+/// These tests exercise the public serde interface of `rguard_core::config`.
+use rguard_core::config::model::{
+    Architecture, FiltersConfig, ProjectConfig, RGuardConfig, SonarqubeConfig, Topology,
 };
 
 // ── round-trip ────────────────────────────────────────────────────────────────
 
 #[test]
 fn config_roundtrip() {
-    let config = RiceGuardConfig {
+    let config = RGuardConfig {
         version: "1".to_string(),
         project: ProjectConfig {
             name: "test-project".to_string(),
@@ -25,7 +25,7 @@ fn config_roundtrip() {
         ..Default::default()
     };
     let yaml = serde_yaml_ng::to_string(&config).expect("serialize failed");
-    let reparsed: RiceGuardConfig = serde_yaml_ng::from_str(&yaml).expect("deserialize failed");
+    let reparsed: RGuardConfig = serde_yaml_ng::from_str(&yaml).expect("deserialize failed");
     assert_eq!(config.version, reparsed.version);
     assert_eq!(config.project.name, reparsed.project.name);
     assert_eq!(config.project.topology, reparsed.project.topology);
@@ -36,7 +36,7 @@ fn config_roundtrip() {
 
 #[test]
 fn default_excludes_present_after_roundtrip() {
-    let config = RiceGuardConfig {
+    let config = RGuardConfig {
         version: "1".to_string(),
         project: ProjectConfig {
             name: "roundtrip-check".to_string(),
@@ -52,7 +52,7 @@ fn default_excludes_present_after_roundtrip() {
         ..Default::default()
     };
     let yaml = serde_yaml_ng::to_string(&config).unwrap();
-    let reparsed: RiceGuardConfig = serde_yaml_ng::from_str(&yaml).unwrap();
+    let reparsed: RGuardConfig = serde_yaml_ng::from_str(&yaml).unwrap();
     for expected in ["vendor/", "node_modules/", "target/", ".git/"] {
         assert!(
             reparsed.filters.exclude.contains(&expected.to_string()),
@@ -78,7 +78,7 @@ scanners:
     enabled: true
     host: "http://localhost:9000"
 "#;
-    let config: RiceGuardConfig = serde_yaml_ng::from_str(yaml).unwrap();
+    let config: RGuardConfig = serde_yaml_ng::from_str(yaml).unwrap();
     assert_eq!(config.scanners.sonarqube.token, None);
     assert_eq!(config.scanners.sonarqube.project_key, None);
     assert!(config.scanners.sonarqube.enabled);
@@ -101,7 +101,7 @@ scanners:
     token: "abc"
     project_key: "my-project"
 "#;
-    let config: RiceGuardConfig = serde_yaml_ng::from_str(yaml).unwrap();
+    let config: RGuardConfig = serde_yaml_ng::from_str(yaml).unwrap();
     assert_eq!(config.scanners.sonarqube.token, Some("abc".to_string()));
     assert_eq!(
         config.scanners.sonarqube.project_key,

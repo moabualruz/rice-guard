@@ -1,8 +1,8 @@
-# rice-guard fix — AI Agent Skill
+# rguard fix — AI Agent Skill
 
 ## Name
 
-`rice-guard-fix` — Deterministic auto-fixing for code quality issues.
+`rguard-fix` — Deterministic auto-fixing for code quality issues.
 
 ## Description
 
@@ -12,15 +12,15 @@ in a safe, ordered pipeline.
 
 ## When to Use
 
-- **After scan**: Fix auto-fixable issues found by `rice-guard scan`
+- **After scan**: Fix auto-fixable issues found by `rguard scan`
 - **CI fix step**: Automated remediation in CI pipelines
 - **Pre-commit**: Quick formatting + linting before committing
 - **Targeted fix**: Fix a specific issue by ID
 
 ## Prerequisites
 
-- `rice-guard` binary installed
-- `.riceguard.yaml` config exists
+- `rguard` binary installed
+- `.rguard.yaml` config exists
 - Fixer tools installed (rustfmt, clippy, ruff, biome, etc.)
 
 ## Commands
@@ -28,46 +28,46 @@ in a safe, ordered pipeline.
 ### Fix all (run all enabled fixer stages)
 
 ```bash
-rice-guard fix [path]
+rguard fix [path]
 ```
 
 ### Fix by category
 
 ```bash
-rice-guard fix [path] --formatters    # Formatters only
-rice-guard fix [path] --linters       # Linter auto-fix only
-rice-guard fix [path] --security      # Semgrep --autofix only
-rice-guard fix [path] --ast           # ast-grep fix rules only
-rice-guard fix [path] --deps          # Dependency updates only
-rice-guard fix [path] --imports       # Import cleanup only
+rguard fix [path] --formatters    # Formatters only
+rguard fix [path] --linters       # Linter auto-fix only
+rguard fix [path] --security      # Semgrep --autofix only
+rguard fix [path] --ast           # ast-grep fix rules only
+rguard fix [path] --deps          # Dependency updates only
+rguard fix [path] --imports       # Import cleanup only
 ```
 
 ### Preview fixes (no changes applied)
 
 ```bash
-rice-guard fix [path] --dry-run
+rguard fix [path] --dry-run
 ```
 
 ### Fix specific issues
 
 ```bash
-rice-guard fix [path] --issue <ID>           # Fix one issue by ID
-rice-guard fix [path] --issues issues.json   # Fix issues from a file
+rguard fix [path] --issue <ID>           # Fix one issue by ID
+rguard fix [path] --issues issues.json   # Fix issues from a file
 ```
 
 ### Include unsafe fixes (requires confirmation)
 
 ```bash
-rice-guard fix [path] --unsafe --yes    # Skip confirmation (CI)
+rguard fix [path] --unsafe --yes    # Skip confirmation (CI)
 ```
 
 ### Additional flags
 
 ```bash
-rice-guard fix [path] --diff            # Include diffs in report
-rice-guard fix [path] --rescan          # Re-check after fixing
-rice-guard fix [path] --timeout 300     # Set pipeline timeout (seconds)
-rice-guard fix [path] file1.rs file2.rs # Fix specific files only
+rguard fix [path] --diff            # Include diffs in report
+rguard fix [path] --rescan          # Re-check after fixing
+rguard fix [path] --timeout 300     # Set pipeline timeout (seconds)
+rguard fix [path] file1.rs file2.rs # Fix specific files only
 ```
 
 ## Fix Pipeline Order
@@ -109,9 +109,9 @@ Each stage: check → fix → verify → record.
 scan → fix → rescan → verify
 ```
 
-1. `rice-guard scan .` — find all issues
-2. `rice-guard fix .` — apply deterministic fixes
-3. `rice-guard fix . --rescan` — or re-scan to verify
+1. `rguard scan .` — find all issues
+2. `rguard fix .` — apply deterministic fixes
+3. `rguard fix . --rescan` — or re-scan to verify
 4. Review `issues-remaining.json` for manual/AI fixes
 
 ## MCP Integration

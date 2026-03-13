@@ -19,7 +19,7 @@ pub struct ScannerDescriptor {
     pub commands: ScannerCommands,
     /// Raw output format: `"sarif"` or `"json"`.
     pub output_format: String,
-    /// Maps scanner-native severity labels to rice-guard severities.
+    /// Maps scanner-native severity labels to riceGuard severities.
     #[serde(default)]
     pub severity_map: HashMap<String, String>,
 }
@@ -53,7 +53,7 @@ pub struct ScannerCommand {
     /// Command template string. Placeholders: `{{output_dir}}`, `{{target}}`.
     pub cmd: String,
     /// Optional timeout in seconds. When absent, the scanner runs until it
-    /// finishes. Users can set this globally or per-scanner in `.riceguard.yaml`.
+    /// finishes. Users can set this globally or per-scanner in `.rguard.yaml`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u32>,
 }

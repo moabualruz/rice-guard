@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerificationInfo {
     /// Shell command to re-run after applying a fix.
-    /// Example: `"rice-guard scan . --security"`, `"cargo clippy"`.
+    /// Example: `"rguard scan . --security"`, `"cargo clippy"`.
     pub rerun_command: String,
 
     /// Human-readable description of the expected outcome after a successful fix.
@@ -28,7 +28,7 @@ impl VerificationInfo {
             "trivy" => "trivy fs .".to_string(),
             "gitleaks" => "gitleaks detect .".to_string(),
             "clippy" => "cargo clippy".to_string(),
-            _ => "rice-guard scan .".to_string(),
+            _ => "rguard scan .".to_string(),
         };
 
         Self {
@@ -55,9 +55,9 @@ mod tests {
     }
 
     #[test]
-    fn unknown_scanner_falls_back_to_rice_guard() {
+    fn unknown_scanner_falls_back_to_rguard() {
         let info = VerificationInfo::from_scanner("custom", "some-rule");
-        assert!(info.rerun_command.contains("rice-guard"));
+        assert!(info.rerun_command.contains("rguard"));
     }
 
     #[test]

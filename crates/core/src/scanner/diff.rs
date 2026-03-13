@@ -124,5 +124,5 @@ pub async fn diff_only_filter(target: &Path) -> Result<Vec<PathBuf>, DiffError> 
 /// Minimal log helper — uses `eprintln!` since the `tracing` crate is not
 /// yet wired up in this crate.  Replace with `tracing::warn!` in Phase 5.
 fn tracing_or_eprintln(msg: &str) {
-    eprintln!("WARN rice-guard: {msg}");
+    eprintln!("WARN rguard: {msg}");
 }

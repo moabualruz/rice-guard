@@ -1,8 +1,8 @@
-# rice-guard security-audit — AI Agent Skill
+# rguard security-audit — AI Agent Skill
 
 ## Name
 
-`rice-guard-security-audit` — Security-focused scanning and remediation workflow.
+`rguard-security-audit` — Security-focused scanning and remediation workflow.
 
 ## Description
 
@@ -19,8 +19,8 @@ misconfigurations, then applies deterministic fixes where possible.
 
 ## Prerequisites
 
-- `rice-guard` binary installed
-- `.riceguard.yaml` config exists
+- `rguard` binary installed
+- `.rguard.yaml` config exists
 - Security scanners: Semgrep, Trivy, Gitleaks
 
 ## Workflow
@@ -28,7 +28,7 @@ misconfigurations, then applies deterministic fixes where possible.
 ### Step 1: Security scan
 
 ```bash
-rice-guard scan . --security
+rguard scan . --security
 ```
 
 Runs Semgrep (SAST) + Trivy (CVEs, secrets, IaC) + Gitleaks (git history).
@@ -49,8 +49,8 @@ cat reports/latest/issues-fixable.json | jq '[.[] | select(.category == "securit
 ### Step 3: Apply deterministic fixes
 
 ```bash
-rice-guard fix . --security          # Semgrep --autofix rules
-rice-guard fix . --deps              # Dependency CVE updates
+rguard fix . --security          # Semgrep --autofix rules
+rguard fix . --deps              # Dependency CVE updates
 ```
 
 ### Step 4: Review remaining
@@ -125,7 +125,7 @@ AI agents can use this evidence to generate fixes without reading source files.
 
 ## MCP Integration
 
-For automated security workflows via MCP server (`rice-guard mcp`):
+For automated security workflows via MCP server (`rguard mcp`):
 
 ```
 1. scan_project(security=true)     → get findings

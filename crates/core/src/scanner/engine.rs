@@ -4,7 +4,7 @@ use std::path::Path;
 use thiserror::Error;
 use tokio::task::JoinSet;
 
-use crate::config::RiceGuardConfig;
+use crate::config::RGuardConfig;
 use crate::ignore::ExcludeArgs;
 use crate::registry::ScannerDescriptor;
 
@@ -68,7 +68,7 @@ pub enum ScanMode {
 /// driven by `run()` to produce parsed `RawFinding`s for downstream use.
 pub struct ScannerEngine {
     descriptors: Vec<ScannerDescriptor>,
-    config: RiceGuardConfig,
+    config: RGuardConfig,
 }
 
 impl ScannerEngine {
@@ -76,7 +76,7 @@ impl ScannerEngine {
     ///
     /// `descriptors` — loaded scanner plugin descriptors (from YAML).
     /// `config` — project config (controls which scanners are enabled).
-    pub fn new(descriptors: Vec<ScannerDescriptor>, config: RiceGuardConfig) -> Self {
+    pub fn new(descriptors: Vec<ScannerDescriptor>, config: RGuardConfig) -> Self {
         Self {
             descriptors,
             config,

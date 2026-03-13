@@ -5,9 +5,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install rice-guard
-        run: curl -fsSL https://install.rice-guard.dev | sh
+      - name: Install rguard
+        run: curl -fsSL https://install.rguard.dev | sh
       - name: Scan
-        run: rice-guard scan . --diff-only
+        run: rguard scan . --diff-only
         env:
-          RICE_GUARD_FAIL_ON: high
+          RGUARD_FAIL_ON: high

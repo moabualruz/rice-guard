@@ -1,14 +1,14 @@
 use std::path::Path;
 
-use crate::config::model::RiceGuardConfig;
+use crate::config::model::RGuardConfig;
 use crate::errors::ConfigError;
 
-/// Load and parse a `.riceguard.yaml` file from the given path.
+/// Load and parse a `.rguard.yaml` file from the given path.
 ///
 /// Returns `ConfigError::NotFound` if the file does not exist,
 /// `ConfigError::IoError` on read failure, and `ConfigError::ParseError`
 /// if the YAML is malformed.
-pub fn load(path: &Path) -> Result<RiceGuardConfig, ConfigError> {
+pub fn load(path: &Path) -> Result<RGuardConfig, ConfigError> {
     if !path.exists() {
         return Err(ConfigError::NotFound {
             path: path.display().to_string(),
@@ -20,7 +20,7 @@ pub fn load(path: &Path) -> Result<RiceGuardConfig, ConfigError> {
         source: e,
     })?;
 
-    let config: RiceGuardConfig =
+    let config: RGuardConfig =
         serde_yaml_ng::from_str(&contents).map_err(|e| ConfigError::ParseError {
             path: path.display().to_string(),
             reason: e.to_string(),
@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn load_returns_not_found_for_missing_file() {
-        let path = Path::new("/nonexistent/path/.riceguard.yaml");
+        let path = Path::new("/nonexistent/path/.rguard.yaml");
         let result = load(path);
         assert!(matches!(result, Err(ConfigError::NotFound { .. })));
     }

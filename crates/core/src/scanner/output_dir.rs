@@ -10,7 +10,7 @@ use chrono::Utc;
 /// # Example
 ///
 /// ```rust,no_run
-/// use rice_guard_core::scanner::OutputDir;
+/// use rguard_core::scanner::OutputDir;
 ///
 /// let dir = OutputDir::new("my-app", "reports").unwrap();
 /// println!("scan output at: {}", dir.path().display());

@@ -1,19 +1,19 @@
 use std::path::PathBuf;
 
 /// The primary project-level ignore file name.
-pub const RICEGUARDIGNORE: &str = ".riceguardignore";
+pub const RGUARDIGNORE: &str = ".rguardignore";
 
-/// The secondary project-level ignore file name (fallback when `.riceguardignore` absent).
+/// The secondary project-level ignore file name (fallback when `.rguardignore` absent).
 pub const RGIGNORE: &str = ".rgignore";
 
 /// Returns the platform-appropriate path to the global ignore file.
 ///
-/// On Linux/macOS: `~/.config/riceguard/ignore`
-/// On Windows:     `%APPDATA%\riceguard\ignore`
+/// On Linux/macOS: `~/.config/rguard/ignore`
+/// On Windows:     `%APPDATA%\rguard\ignore`
 ///
 /// Returns `None` if the platform config directory cannot be determined.
 pub fn global_ignore_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("riceguard").join("ignore"))
+    dirs::config_dir().map(|d| d.join("rguard").join("ignore"))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -23,15 +23,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn global_ignore_path_contains_riceguard_and_ignore() {
+    fn global_ignore_path_contains_rguard_and_ignore() {
         let path = global_ignore_path();
         // This may return None in unusual CI environments, so we only assert
         // when Some is returned.
         if let Some(p) = path {
             let display = p.to_string_lossy();
             assert!(
-                display.contains("riceguard"),
-                "global ignore path should contain 'riceguard', got: {display}"
+                display.contains("rguard"),
+                "global ignore path should contain 'rguard', got: {display}"
             );
             // The final component should be "ignore"
             assert_eq!(
@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn constants_have_expected_values() {
-        assert_eq!(RICEGUARDIGNORE, ".riceguardignore");
+        assert_eq!(RGUARDIGNORE, ".rguardignore");
         assert_eq!(RGIGNORE, ".rgignore");
     }
 }

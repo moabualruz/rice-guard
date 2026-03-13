@@ -25,7 +25,7 @@ use crate::issue::Issue;
 /// # Example
 ///
 /// ```rust,no_run
-/// use rice_guard_core::output::{OutputWriter, ScanSummary};
+/// use rguard_core::output::{OutputWriter, ScanSummary};
 ///
 /// let writer = OutputWriter::new(std::path::Path::new("/tmp/scan-out"));
 /// // writer.write_all(&issues, &summary).unwrap();
@@ -161,7 +161,7 @@ mod tests {
                 complexity: FixComplexity::Trivial,
             },
             verification: VerificationInfo {
-                rerun_command: "rice-guard scan .".to_string(),
+                rerun_command: "rguard scan .".to_string(),
                 success_condition: "no findings".to_string(),
             },
             priority_score: score,

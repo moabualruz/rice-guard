@@ -8,6 +8,6 @@ use crate::args::ServeArgs;
 pub async fn run(args: ServeArgs) -> anyhow::Result<i32> {
     let working_dir = std::env::current_dir()
         .map_err(|e| anyhow::anyhow!("Cannot determine working directory: {e}"))?;
-    rice_guard_server::rest::start_server(args.port, working_dir).await?;
+    rguard_server::rest::start_server(args.port, working_dir).await?;
     Ok(0)
 }

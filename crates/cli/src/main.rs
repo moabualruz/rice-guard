@@ -1,4 +1,4 @@
-/// rice-guard CLI binary entry point.
+/// rguard CLI binary entry point.
 ///
 /// Parses command-line arguments, initializes tracing, routes to subcommand
 /// handlers, and translates `anyhow::Result<i32>` into process exit codes.

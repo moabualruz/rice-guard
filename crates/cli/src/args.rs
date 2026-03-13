@@ -1,19 +1,19 @@
 /// Command-line argument definitions using clap derive macros.
 ///
-/// Defines the full CLI surface for `rice-guard`: all 8 subcommands
+/// Defines the full CLI surface for `rguard`: all 8 subcommands
 /// with their flags and arguments.
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
 use std::path::PathBuf;
 
-/// rice-guard — cross-platform code quality, security scanning, and
+/// rguard — cross-platform code quality, security scanning, and
 /// deterministic auto-fixing.
 #[derive(Debug, Parser)]
 #[command(
-    name = "rice-guard",
+    name = "rguard",
     version,
     about = "Cross-platform code quality, security scanning, and deterministic auto-fixing",
-    long_about = "rice-guard scans your project for code quality, security, and \
+    long_about = "rguard scans your project for code quality, security, and \
                   duplication issues, then applies deterministic fixes — zero AI, \
                   zero tokens, zero API keys required.\n\n\
                   Exit codes: 0 = clean/success, 1 = issues found, 2 = tool error",
@@ -42,16 +42,16 @@ pub enum Commands {
     Mcp(McpArgs),
 }
 
-/// Detect project languages, probe available tools, and generate `.riceguard.yaml`.
+/// Detect project languages, probe available tools, and generate `.rguard.yaml`.
 #[derive(Debug, clap::Args)]
 #[command(
-    about = "Detect project languages, probe available tools, and generate .riceguard.yaml",
+    about = "Detect project languages, probe available tools, and generate .rguard.yaml",
     long_about = "Runs the 3-step init pipeline:\n  \
                   1. scc language detection\n  \
                   2. Scanner tool probing\n  \
                   3. Fixer tool probing\n\n\
                   Then runs an interactive wizard (or uses defaults with --yes) to\n\
-                  generate .riceguard.yaml and optional CI/pre-commit configs."
+                  generate .rguard.yaml and optional CI/pre-commit configs."
 )]
 pub struct InitArgs {
     /// Path to the project to initialize (defaults to current directory).
@@ -190,9 +190,9 @@ pub struct StatusArgs {
     pub path: PathBuf,
 }
 
-/// Start the rice-guard REST API server.
+/// Start the rguard REST API server.
 #[derive(Debug, clap::Args)]
-#[command(about = "Start the rice-guard REST API server")]
+#[command(about = "Start the rguard REST API server")]
 pub struct ServeArgs {
     /// Port to listen on.
     #[arg(long, default_value = "8080")]
@@ -226,7 +226,7 @@ pub struct VersionArgs {
     pub completions: Option<Shell>,
 }
 
-/// Start the rice-guard MCP stdio server for Claude Code / Cursor integration.
+/// Start the rguard MCP stdio server for Claude Code / Cursor integration.
 #[derive(Debug, clap::Args)]
 #[command(about = "Start the MCP stdio server (for Claude Code / Cursor)")]
 pub struct McpArgs {

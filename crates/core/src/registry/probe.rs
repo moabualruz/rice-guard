@@ -57,7 +57,7 @@ pub fn resolve_command(exe: &str) -> tokio::process::Command {
 ///
 /// # Example
 /// ```
-/// # use rice_guard_core::registry::probe::build_command;
+/// # use rguard_core::registry::probe::build_command;
 /// let args = build_command(
 ///     "scc --format json {{output_dir}}",
 ///     &[("output_dir", "my dir/out")],

@@ -4,7 +4,7 @@ use std::process::Stdio;
 use thiserror::Error;
 use tokio::time::{timeout, Duration};
 
-use crate::config::RiceGuardConfig;
+use crate::config::RGuardConfig;
 use crate::errors::DescriptorError;
 use crate::registry::probe::{build_command, resolve_command};
 use crate::registry::ScannerDescriptor;
@@ -66,7 +66,7 @@ pub enum ScannerRunError {
 /// from the active ignore patterns (e.g. `--exclude vendor` for Semgrep).
 pub async fn run_one_scanner(
     descriptor: &ScannerDescriptor,
-    config: &RiceGuardConfig,
+    config: &RGuardConfig,
     output_dir: &Path,
     target: &Path,
     mode: &ScanMode,

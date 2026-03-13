@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 
 use axum::extract::{Path as AxumPath, State};
 use axum::Json;
-use rice_guard_core::fixer::engine::FixerEngineConfig;
-use rice_guard_core::fixer::{FixReport, FixerEngine, StageFilter};
-use rice_guard_core::issue::{sort_issues, FixerDescriptorInfo, Issue, IssueBuilder};
-use rice_guard_core::output::{OutputWriter, ScanSummary};
-use rice_guard_core::registry::DescriptorRegistry;
-use rice_guard_core::scanner::{OutputDir, ScanMode, ScannerEngine};
+use rguard_core::fixer::engine::FixerEngineConfig;
+use rguard_core::fixer::{FixReport, FixerEngine, StageFilter};
+use rguard_core::issue::{sort_issues, FixerDescriptorInfo, Issue, IssueBuilder};
+use rguard_core::output::{OutputWriter, ScanSummary};
+use rguard_core::registry::DescriptorRegistry;
+use rguard_core::scanner::{OutputDir, ScanMode, ScannerEngine};
 use serde_json::{json, Value};
 
 use super::error::ApiError;
@@ -61,21 +61,21 @@ fn find_latest_reports_dir(base: &Path) -> anyhow::Result<PathBuf> {
 /// Load scanner descriptors for the given project path.
 fn load_scanner_descriptors(
     project_path: &Path,
-) -> Result<Vec<rice_guard_core::registry::ScannerDescriptor>, ApiError> {
-    rice_guard_core::registry::loader::load_scanner_descriptors(project_path)
+) -> Result<Vec<rguard_core::registry::ScannerDescriptor>, ApiError> {
+    rguard_core::registry::loader::load_scanner_descriptors(project_path)
         .map_err(|e| ApiError::internal(&format!("Failed to load scanner descriptors: {e}")))
 }
 
 /// Load config for the given project path.
-fn load_config(project_path: &Path) -> Result<rice_guard_core::config::RiceGuardConfig, ApiError> {
-    let config_path = project_path.join(".riceguard.yaml");
-    rice_guard_core::config::load(&config_path)
+fn load_config(project_path: &Path) -> Result<rguard_core::config::RGuardConfig, ApiError> {
+    let config_path = project_path.join(".rguard.yaml");
+    rguard_core::config::load(&config_path)
         .map_err(|e| ApiError::bad_request("CONFIG_NOT_FOUND", &e.to_string()))
 }
 
 /// Convert FixerDescriptors to FixerDescriptorInfo list.
 fn to_fixer_descriptor_infos(
-    fixer_descriptors: Vec<rice_guard_core::registry::FixerDescriptor>,
+    fixer_descriptors: Vec<rguard_core::registry::FixerDescriptor>,
 ) -> Vec<FixerDescriptorInfo> {
     fixer_descriptors
         .into_iter()
@@ -166,7 +166,7 @@ pub async fn scan_handler(
 
     // Load fixer descriptors for build_batch.
     let fixer_descriptor_infos: Vec<FixerDescriptorInfo> =
-        match rice_guard_core::registry::loader::load_fixer_descriptors(&project_path) {
+        match rguard_core::registry::loader::load_fixer_descriptors(&project_path) {
             Ok(fds) => to_fixer_descriptor_infos(fds),
             Err(e) => {
                 tracing::warn!("Failed to load fixer descriptors: {e}; using empty list");
@@ -273,7 +273,7 @@ pub async fn fix_handler(
 
     // Load fixer descriptors.
     let fixer_descriptors =
-        match rice_guard_core::registry::loader::load_fixer_descriptors(&project_path) {
+        match rguard_core::registry::loader::load_fixer_descriptors(&project_path) {
             Ok(d) => d,
             Err(e) => {
                 tracing::warn!(

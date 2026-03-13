@@ -1,10 +1,10 @@
-use crate::config::model::RiceGuardConfig;
+use crate::config::model::RGuardConfig;
 use crate::errors::ConfigError;
 
 /// Validate the semantic constraints on a loaded config.
 ///
 /// Returns `ConfigError::ValidationError` if any constraint is violated.
-pub fn validate(config: &RiceGuardConfig) -> Result<(), ConfigError> {
+pub fn validate(config: &RGuardConfig) -> Result<(), ConfigError> {
     if config.version != "1" {
         return Err(ConfigError::ValidationError {
             message: format!(
@@ -29,8 +29,8 @@ mod tests {
 
     use super::*;
 
-    fn make_config(version: &str, name: &str) -> RiceGuardConfig {
-        RiceGuardConfig {
+    fn make_config(version: &str, name: &str) -> RGuardConfig {
+        RGuardConfig {
             version: version.into(),
             project: ProjectConfig {
                 name: name.into(),

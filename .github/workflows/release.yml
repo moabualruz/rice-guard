@@ -58,29 +58,29 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
-          RICE_GUARD_BUILD_INFO: ${{ github.ref_name }}
+          RGUARD_BUILD_INFO: ${{ github.ref_name }}
 
       - name: Package (Unix)
         if: matrix.archive == 'tar.gz'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../rice-guard-${{ matrix.target }}.tar.gz rice-guard
+          tar czf ../../../rguard-${{ matrix.target }}.tar.gz rguard
           cd ../../..
-          sha256sum rice-guard-${{ matrix.target }}.tar.gz > rice-guard-${{ matrix.target }}.tar.gz.sha256
+          sha256sum rguard-${{ matrix.target }}.tar.gz > rguard-${{ matrix.target }}.tar.gz.sha256
 
       - name: Package (Windows)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          Compress-Archive -Path target/${{ matrix.target }}/release/rice-guard.exe -DestinationPath rice-guard-${{ matrix.target }}.zip
-          (Get-FileHash rice-guard-${{ matrix.target }}.zip -Algorithm SHA256).Hash.ToLower() + "  rice-guard-${{ matrix.target }}.zip" | Out-File -Encoding ascii rice-guard-${{ matrix.target }}.zip.sha256
+          Compress-Archive -Path target/${{ matrix.target }}/release/rguard.exe -DestinationPath rguard-${{ matrix.target }}.zip
+          (Get-FileHash rguard-${{ matrix.target }}.zip -Algorithm SHA256).Hash.ToLower() + "  rguard-${{ matrix.target }}.zip" | Out-File -Encoding ascii rguard-${{ matrix.target }}.zip.sha256
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rice-guard-${{ matrix.target }}
+          name: rguard-${{ matrix.target }}
           path: |
-            rice-guard-${{ matrix.target }}.*
+            rguard-${{ matrix.target }}.*
 
   release:
     name: Create Release

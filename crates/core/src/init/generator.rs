@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config::model::{
     Architecture, CiConfig, FiltersConfig, FixersConfig, HooksConfig, OutputConfig,
-    PreCommitConfig, ProjectConfig, RiceGuardConfig, ScannersConfig, ToolsConfig,
+    PreCommitConfig, ProjectConfig, RGuardConfig, ScannersConfig, ToolsConfig,
 };
 use crate::errors::InitError;
 use crate::init::detector::DetectionResult;
@@ -17,7 +17,7 @@ use crate::registry::probe::ProbeResult;
 /// Not used directly in generation (config is produced via serde_yaml_ng);
 /// kept for `include_str!()` compile-time validation of the template file.
 #[allow(dead_code)]
-const TMPL_RICEGUARD: &str = include_str!("../../../../templates/riceguard.yaml.tmpl");
+const TMPL_RICEGUARD: &str = include_str!("../../../../templates/rguard.yaml.tmpl");
 
 /// lefthook pre-commit template.
 const TMPL_LEFTHOOK: &str = include_str!("../../../../templates/lefthook.yml.tmpl");
@@ -36,7 +36,7 @@ const TMPL_SEMGREP_ARCH: &str =
 ///
 /// Uses gitignore-compatible syntax. Generated once; not overwritten if the
 /// file already exists so users can customise it freely.
-const STARTER_RGIGNORE: &str = "# rice-guard ignore file - gitignore-compatible syntax\n\
+const STARTER_RGIGNORE: &str = "# rguard ignore file - gitignore-compatible syntax\n\
 # Full docs: https://git-scm.com/docs/gitignore\n\
 \n\
 # Build artifacts\n\
@@ -72,33 +72,33 @@ pub struct GeneratorInput {
     pub choices: WizardChoices,
 }
 
-/// Generate the `.riceguard.yaml` config file and any optional support files.
+/// Generate the `.rguard.yaml` config file and any optional support files.
 ///
 /// Returns the list of files created on disk.
 ///
 /// # Generated files
 ///
-/// - `.riceguard.yaml` — always written
+/// - `.rguard.yaml` — always written
 /// - `lefthook.yml` — when `choices.pre_commit == true`
 /// - `.github/workflows/quality.yml` — when `ci_provider == Github`
 /// - `.gitlab-ci.yml` — when `ci_provider == Gitlab`
-/// - `.riceguard/semgrep/architecture.yaml` — when `architecture != None`
-/// - `.riceguard/ast-grep/patterns.yaml` — always written
+/// - `.rguard/semgrep/architecture.yaml` — when `architecture != None`
+/// - `.rguard/ast-grep/patterns.yaml` — always written
 pub async fn generate(input: &GeneratorInput) -> Result<Vec<PathBuf>, InitError> {
     let mut created: Vec<PathBuf> = Vec::new();
 
-    // ── Build RiceGuardConfig from detection + choices ───────────────────────
+    // ── Build RGuardConfig from detection + choices ───────────────────────
     let config = build_config(input);
 
     // ── Serialize to YAML ────────────────────────────────────────────────────
     let config_yaml =
         serde_yaml_ng::to_string(&config).map_err(|e| InitError::GenerationFailed {
-            path: ".riceguard.yaml".into(),
+            path: ".rguard.yaml".into(),
             reason: e.to_string(),
         })?;
 
-    // ── Write .riceguard.yaml ────────────────────────────────────────────────
-    let config_path = input.project_path.join(".riceguard.yaml");
+    // ── Write .rguard.yaml ────────────────────────────────────────────────
+    let config_path = input.project_path.join(".rguard.yaml");
     write_file(&config_path, &config_yaml)?;
     created.push(normalize_path(&config_path));
 
@@ -139,7 +139,7 @@ pub async fn generate(input: &GeneratorInput) -> Result<Vec<PathBuf>, InitError>
 
     // ── Semgrep architecture rules ───────────────────────────────────────────
     if input.choices.architecture != Architecture::None {
-        let dir = input.project_path.join(".riceguard").join("semgrep");
+        let dir = input.project_path.join(".rguard").join("semgrep");
         std::fs::create_dir_all(&dir).map_err(|e| InitError::GenerationFailed {
             path: dir.to_string_lossy().replace('\\', "/"),
             reason: e.to_string(),
@@ -162,7 +162,7 @@ pub async fn generate(input: &GeneratorInput) -> Result<Vec<PathBuf>, InitError>
 
     // ── ast-grep pattern stubs ───────────────────────────────────────────────
     {
-        let dir = input.project_path.join(".riceguard").join("ast-grep");
+        let dir = input.project_path.join(".rguard").join("ast-grep");
         std::fs::create_dir_all(&dir).map_err(|e| InitError::GenerationFailed {
             path: dir.to_string_lossy().replace('\\', "/"),
             reason: e.to_string(),
@@ -186,8 +186,8 @@ pub async fn generate(input: &GeneratorInput) -> Result<Vec<PathBuf>, InitError>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Build a [`RiceGuardConfig`] from detection results and wizard choices.
-fn build_config(input: &GeneratorInput) -> RiceGuardConfig {
+/// Build a [`RGuardConfig`] from detection results and wizard choices.
+fn build_config(input: &GeneratorInput) -> RGuardConfig {
     let languages: Vec<String> = input
         .detection
         .languages
@@ -225,7 +225,7 @@ fn build_config(input: &GeneratorInput) -> RiceGuardConfig {
         CiProvider::None => "none",
     };
 
-    RiceGuardConfig {
+    RGuardConfig {
         version: "1".into(),
         project: ProjectConfig {
             name: input.project_name.clone(),
@@ -321,7 +321,7 @@ fn normalize_path(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::model::{Architecture, RiceGuardConfig, Topology};
+    use crate::config::model::{Architecture, RGuardConfig, Topology};
     use crate::init::detector::{DetectionResult, SccLanguage};
     use crate::init::wizard::{CiProvider, WizardChoices};
     use crate::registry::probe::ProbeResult;
@@ -378,8 +378,8 @@ mod tests {
         }
     }
 
-    /// `generate()` writes a `.riceguard.yaml` that parses back as
-    /// `RiceGuardConfig` without error (round-trip test).
+    /// `generate()` writes a `.rguard.yaml` that parses back as
+    /// `RGuardConfig` without error (round-trip test).
     #[tokio::test]
     async fn roundtrip() {
         let tmp = TempDir::new().unwrap();
@@ -391,16 +391,13 @@ mod tests {
             "generate must return at least one created file"
         );
 
-        let config_path = tmp.path().join(".riceguard.yaml");
-        assert!(
-            config_path.exists(),
-            ".riceguard.yaml must be written to disk"
-        );
+        let config_path = tmp.path().join(".rguard.yaml");
+        assert!(config_path.exists(), ".rguard.yaml must be written to disk");
 
-        let yaml = std::fs::read_to_string(&config_path).expect(".riceguard.yaml must be readable");
+        let yaml = std::fs::read_to_string(&config_path).expect(".rguard.yaml must be readable");
 
-        let config: RiceGuardConfig =
-            serde_yaml_ng::from_str(&yaml).expect(".riceguard.yaml must be valid YAML config");
+        let config: RGuardConfig =
+            serde_yaml_ng::from_str(&yaml).expect(".rguard.yaml must be valid YAML config");
 
         assert_eq!(config.version, "1");
         assert_eq!(config.project.name, "test-project");
@@ -419,8 +416,8 @@ mod tests {
         let input = make_input(&tmp);
 
         generate(&input).await.expect("generate must succeed");
-        let yaml = std::fs::read_to_string(tmp.path().join(".riceguard.yaml")).unwrap();
-        let config: RiceGuardConfig = serde_yaml_ng::from_str(&yaml).unwrap();
+        let yaml = std::fs::read_to_string(tmp.path().join(".rguard.yaml")).unwrap();
+        let config: RGuardConfig = serde_yaml_ng::from_str(&yaml).unwrap();
 
         // semgrep was Available → must be enabled.
         assert!(
@@ -561,8 +558,8 @@ mod tests {
 
         generate(&input).await.expect("generate must succeed");
 
-        let yaml = std::fs::read_to_string(tmp.path().join(".riceguard.yaml")).unwrap();
-        let config: RiceGuardConfig = serde_yaml_ng::from_str(&yaml).unwrap();
+        let yaml = std::fs::read_to_string(tmp.path().join(".rguard.yaml")).unwrap();
+        let config: RGuardConfig = serde_yaml_ng::from_str(&yaml).unwrap();
         assert!(
             config.filters.respect_gitignore,
             "filters.respect_gitignore must be true when wizard selected it"

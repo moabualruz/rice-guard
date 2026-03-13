@@ -1,6 +1,6 @@
 /// SonarQube HTTP client with basic_auth token support.
 use anyhow::{bail, Context};
-use rice_guard_core::config::model::SonarqubeConfig;
+use rguard_core::config::model::SonarqubeConfig;
 use serde::de::DeserializeOwned;
 
 use super::models::SonarResponse;
@@ -45,7 +45,7 @@ impl SonarClient {
         }
         bail!(
             "SonarQube token not found. Set the SONARQUBE_TOKEN environment variable \
-             or add `token: <your-token>` under `sonarqube:` in .riceguard.yaml"
+             or add `token: <your-token>` under `sonarqube:` in .rguard.yaml"
         )
     }
 

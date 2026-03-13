@@ -6,11 +6,11 @@ code-quality:
   image: ubuntu:22.04
   before_script:
     - apt-get update -qq && apt-get install -y curl
-    - curl -fsSL https://install.rice-guard.dev | sh
+    - curl -fsSL https://install.rguard.dev | sh
   script:
-    - rice-guard scan . --diff-only
+    - rguard scan . --diff-only
   variables:
-    RICE_GUARD_FAIL_ON: high
+    RGUARD_FAIL_ON: high
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

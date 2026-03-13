@@ -38,12 +38,12 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     let target = crate::paths::safe_canonicalize(&args.path);
 
     // ── Step 2: load config ───────────────────────────────────────────────────
-    let config_path = target.join(".riceguard.yaml");
-    let config = match rice_guard_core::config::load(&config_path) {
+    let config_path = target.join(".rguard.yaml");
+    let config = match rguard_core::config::load(&config_path) {
         Ok(c) => c,
-        Err(rice_guard_core::errors::ConfigError::NotFound { .. }) => {
+        Err(rguard_core::errors::ConfigError::NotFound { .. }) => {
             output::print_error(&format!(
-                "No .riceguard.yaml found in {}. Run `rice-guard init` first.",
+                "No .rguard.yaml found in {}. Run `rguard init` first.",
                 target.display()
             ));
             return Ok(2);
@@ -62,7 +62,7 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     );
 
     if args.debug_ignores {
-        use rice_guard_core::ignore::IgnoreEngine;
+        use rguard_core::ignore::IgnoreEngine;
         use walkdir::WalkDir;
 
         match IgnoreEngine::build(&target, &config, respect_gitignore) {
@@ -95,7 +95,7 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     }
 
     // ── Step 4: load scanner descriptors ─────────────────────────────────────
-    let descriptors = match rice_guard_core::registry::loader::load_scanner_descriptors(&target) {
+    let descriptors = match rguard_core::registry::loader::load_scanner_descriptors(&target) {
         Ok(d) => d,
         Err(e) => {
             output::print_error(&format!("Failed to load scanner descriptors: {e}"));
@@ -106,25 +106,25 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     // ── Step 4: create output directory ──────────────────────────────────────
     let reports_base = target.join("reports").to_string_lossy().to_string();
 
-    let output_dir =
-        match rice_guard_core::scanner::OutputDir::new(&config.project.name, &reports_base) {
-            Ok(d) => d,
-            Err(e) => {
-                output::print_error(&format!("Failed to create output directory: {e}"));
-                return Ok(2);
-            }
-        };
+    let output_dir = match rguard_core::scanner::OutputDir::new(&config.project.name, &reports_base)
+    {
+        Ok(d) => d,
+        Err(e) => {
+            output::print_error(&format!("Failed to create output directory: {e}"));
+            return Ok(2);
+        }
+    };
 
     // ── Step 5: determine scan mode (composable flags) ────────────────────────
     // --quick and --security select the scanner subset.
     // --diff-only is orthogonal: it filters findings to git-changed files only.
     // Flags stack: --quick --diff-only runs quick scanners AND applies diff filter.
     let scanner_subset = if args.quick {
-        rice_guard_core::scanner::ScanMode::Quick
+        rguard_core::scanner::ScanMode::Quick
     } else if args.security {
-        rice_guard_core::scanner::ScanMode::Security
+        rguard_core::scanner::ScanMode::Security
     } else {
-        rice_guard_core::scanner::ScanMode::Full
+        rguard_core::scanner::ScanMode::Full
     };
 
     let apply_diff_filter = args.diff_only;
@@ -154,7 +154,7 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     let scan_start = Instant::now();
 
     // ── Step 8: run scanner engine ────────────────────────────────────────────
-    let engine = rice_guard_core::scanner::ScannerEngine::new(descriptors, config);
+    let engine = rguard_core::scanner::ScannerEngine::new(descriptors, config);
     let scan_report = match engine.run(&target, scanner_subset, &output_dir).await {
         Ok(r) => r,
         Err(e) => {
@@ -170,7 +170,7 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
 
     // ── Step 9: apply diff-only filter (orthogonal to scanner subset) ─────────
     if apply_diff_filter {
-        match rice_guard_core::scanner::diff_only_filter(&target).await {
+        match rguard_core::scanner::diff_only_filter(&target).await {
             Ok(changed_files) if !changed_files.is_empty() => {
                 findings.retain(|f| {
                     changed_files.iter().any(|cf| {
@@ -204,14 +204,14 @@ pub async fn run(args: ScanArgs) -> anyhow::Result<i32> {
     }
 
     // ── Step 11: Phase 3 pipeline — enrich findings into Issues ──────────────
-    use rice_guard_core::issue::{sort_issues, FixerDescriptorInfo, IssueBuilder};
-    use rice_guard_core::output::{OutputWriter, ScanSummary};
+    use rguard_core::issue::{sort_issues, FixerDescriptorInfo, IssueBuilder};
+    use rguard_core::output::{OutputWriter, ScanSummary};
 
     // Load fixer descriptors and convert to FixerDescriptorInfo for build_batch().
     // On failure, fall back to an empty list — scan still works, just without
     // descriptor-driven auto_fixable detection.
     let fixer_descriptor_infos: Vec<FixerDescriptorInfo> =
-        match rice_guard_core::registry::loader::load_fixer_descriptors(&target) {
+        match rguard_core::registry::loader::load_fixer_descriptors(&target) {
             Ok(fds) => fds
                 .into_iter()
                 .map(|fd| {

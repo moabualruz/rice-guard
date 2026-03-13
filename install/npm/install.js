@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// rice-guard npm postinstall — downloads the platform-specific binary.
+// rguard npm postinstall — downloads the platform-specific binary.
 "use strict";
 
 const { execSync } = require("child_process");
@@ -8,7 +8,7 @@ const path = require("path");
 const https = require("https");
 const http = require("http");
 
-const REPO = "user/rice-guard"; // TODO: update to real GitHub owner
+const REPO = "rice-guard/rguard"; // TODO: update to real GitHub owner
 const VERSION = require("./package.json").version;
 const BIN_DIR = path.join(__dirname, "bin");
 
@@ -50,30 +50,30 @@ async function main() {
     process.exit(1);
   }
 
-  const url = `https://github.com/${REPO}/releases/download/v${VERSION}/rice-guard-${info.target}.${info.ext}`;
-  console.log(`Downloading rice-guard for ${info.target}...`);
+  const url = `https://github.com/${REPO}/releases/download/v${VERSION}/rguard-${info.target}.${info.ext}`;
+  console.log(`Downloading rguard for ${info.target}...`);
 
   const data = await download(url);
   fs.mkdirSync(BIN_DIR, { recursive: true });
 
   if (info.ext === "tar.gz") {
-    const tmpFile = path.join(BIN_DIR, "rice-guard.tar.gz");
+    const tmpFile = path.join(BIN_DIR, "rguard.tar.gz");
     fs.writeFileSync(tmpFile, data);
     execSync(`tar xzf "${tmpFile}" -C "${BIN_DIR}"`, { stdio: "ignore" });
     fs.unlinkSync(tmpFile);
-    fs.chmodSync(path.join(BIN_DIR, "rice-guard"), 0o755);
+    fs.chmodSync(path.join(BIN_DIR, "rguard"), 0o755);
   } else {
     // zip — extract on Windows
-    const tmpFile = path.join(BIN_DIR, "rice-guard.zip");
+    const tmpFile = path.join(BIN_DIR, "rguard.zip");
     fs.writeFileSync(tmpFile, data);
     execSync(`powershell -Command "Expand-Archive -Path '${tmpFile}' -DestinationPath '${BIN_DIR}' -Force"`, { stdio: "ignore" });
     fs.unlinkSync(tmpFile);
   }
 
-  console.log("rice-guard installed successfully.");
+  console.log("rguard installed successfully.");
 }
 
 main().catch((err) => {
-  console.error("Failed to install rice-guard:", err.message);
+  console.error("Failed to install rguard:", err.message);
   process.exit(1);
 });

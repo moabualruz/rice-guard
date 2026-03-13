@@ -4,7 +4,7 @@
 //! marked `#[ignore]` with an explanation. Tests for structural types
 //! (RawScanResult, ScanMode, OutputDir) and parsers (Plan 02) pass immediately.
 
-use rice_guard_core::scanner::{
+use rguard_core::scanner::{
     parser::{parse_scanner_output, ParseError},
     OutputDir, RawScanResult, ScanMode, ScannerEngine,
 };
@@ -119,8 +119,8 @@ fn raw_scan_result_is_clone() {
 /// ScannerEngine can be constructed (skeleton).
 #[test]
 fn scanner_engine_construction() {
-    use rice_guard_core::config::RiceGuardConfig;
-    let engine = ScannerEngine::new(vec![], RiceGuardConfig::default());
+    use rguard_core::config::RGuardConfig;
+    let engine = ScannerEngine::new(vec![], RGuardConfig::default());
     drop(engine);
 }
 
@@ -220,7 +220,7 @@ fn output_dir_creates_latest_symlink() {
     use tempfile::TempDir;
     let tmp = TempDir::new().unwrap();
     let base = tmp.path().to_string_lossy().to_string();
-    let od = rice_guard_core::scanner::OutputDir::new("myproject", &base).unwrap();
+    let od = rguard_core::scanner::OutputDir::new("myproject", &base).unwrap();
     // Should not error even when called twice (idempotent replacement).
     od.create_latest_symlink(&base).unwrap();
     od.create_latest_symlink(&base).unwrap();
@@ -237,14 +237,14 @@ fn output_dir_creates_latest_symlink() {
 /// SCAN-01 -- All enabled scanners run: with no scanners enabled, engine returns empty vec.
 #[tokio::test]
 async fn scan_01_no_enabled_scanners_returns_empty_vec() {
-    use rice_guard_core::config::RiceGuardConfig;
+    use rguard_core::config::RGuardConfig;
 
     let base = tempfile::tempdir().expect("tempdir");
     let output_dir =
         OutputDir::new("test-project", base.path().to_str().unwrap()).expect("OutputDir::new");
 
-    // RiceGuardConfig::default() has no scanners enabled in tools.scanners.
-    let engine = ScannerEngine::new(vec![], RiceGuardConfig::default());
+    // RGuardConfig::default() has no scanners enabled in tools.scanners.
+    let engine = ScannerEngine::new(vec![], RGuardConfig::default());
     let report = engine
         .run(base.path(), ScanMode::Full, &output_dir)
         .await
@@ -259,7 +259,7 @@ async fn scan_01_no_enabled_scanners_returns_empty_vec() {
 /// SCAN-03 -- Quick mode constant contains exactly the 4 expected scanner names.
 #[test]
 fn scan_03_quick_scanners_constant_has_four_entries() {
-    use rice_guard_core::scanner::QUICK_SCANNERS;
+    use rguard_core::scanner::QUICK_SCANNERS;
     assert_eq!(
         QUICK_SCANNERS.len(),
         4,
@@ -274,7 +274,7 @@ fn scan_03_quick_scanners_constant_has_four_entries() {
 /// SCAN-04 -- Security mode constant contains exactly the 3 expected scanner names.
 #[test]
 fn scan_04_security_scanners_constant_has_three_entries() {
-    use rice_guard_core::scanner::SECURITY_SCANNERS;
+    use rguard_core::scanner::SECURITY_SCANNERS;
     assert_eq!(
         SECURITY_SCANNERS.len(),
         3,
@@ -288,8 +288,8 @@ fn scan_04_security_scanners_constant_has_three_entries() {
 /// SCAN-03 -- Quick mode selects only the 4 quick scanners from a full descriptor list.
 #[tokio::test]
 async fn scan_03_quick_mode_selects_correct_subset() {
-    use rice_guard_core::config::RiceGuardConfig;
-    use rice_guard_core::registry::loader::load_scanner_descriptors;
+    use rguard_core::config::RGuardConfig;
+    use rguard_core::registry::loader::load_scanner_descriptors;
 
     let tmp = tempfile::tempdir().expect("tempdir");
     let descriptors = load_scanner_descriptors(tmp.path()).expect("load built-ins");
@@ -300,7 +300,7 @@ async fn scan_03_quick_mode_selects_correct_subset() {
 
     // No scanners enabled in tools.scanners => all Unavailable (warn + skip).
     // We just verify that the call completes without panic for Quick mode.
-    let engine = ScannerEngine::new(descriptors, RiceGuardConfig::default());
+    let engine = ScannerEngine::new(descriptors, RGuardConfig::default());
     let result = engine
         .run(tmp.path(), ScanMode::Quick, &output_dir)
         .await
@@ -316,8 +316,8 @@ async fn scan_03_quick_mode_selects_correct_subset() {
 /// SCAN-04 -- Security mode with no enabled scanners returns empty, no panic.
 #[tokio::test]
 async fn scan_04_security_mode_no_enabled_scanners_returns_empty() {
-    use rice_guard_core::config::RiceGuardConfig;
-    use rice_guard_core::registry::loader::load_scanner_descriptors;
+    use rguard_core::config::RGuardConfig;
+    use rguard_core::registry::loader::load_scanner_descriptors;
 
     let tmp = tempfile::tempdir().expect("tempdir");
     let descriptors = load_scanner_descriptors(tmp.path()).expect("load built-ins");
@@ -325,7 +325,7 @@ async fn scan_04_security_mode_no_enabled_scanners_returns_empty() {
     let output_dir =
         OutputDir::new("test-project", tmp.path().to_str().unwrap()).expect("OutputDir::new");
 
-    let engine = ScannerEngine::new(descriptors, RiceGuardConfig::default());
+    let engine = ScannerEngine::new(descriptors, RGuardConfig::default());
     let result = engine
         .run(tmp.path(), ScanMode::Security, &output_dir)
         .await
@@ -340,14 +340,14 @@ async fn scan_04_security_mode_no_enabled_scanners_returns_empty() {
 /// SCAN-05 -- DiffOnly mode: non-git directory gracefully falls back to full scan.
 #[tokio::test]
 async fn scan_05_diff_only_non_git_dir_falls_back_gracefully() {
-    use rice_guard_core::config::RiceGuardConfig;
+    use rguard_core::config::RGuardConfig;
 
     // Use a tempdir that is NOT a git repo.
     let tmp = tempfile::tempdir().expect("tempdir");
     let output_dir =
         OutputDir::new("test-project", tmp.path().to_str().unwrap()).expect("OutputDir::new");
 
-    let engine = ScannerEngine::new(vec![], RiceGuardConfig::default());
+    let engine = ScannerEngine::new(vec![], RGuardConfig::default());
     // Should return Ok (graceful fallback), not panic or error.
     let result = engine
         .run(tmp.path(), ScanMode::DiffOnly, &output_dir)

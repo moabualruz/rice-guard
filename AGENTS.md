@@ -1,4 +1,4 @@
-# rice-guard — Agent Instructions
+# riceGuard — Agent Instructions
 
 This file follows the [AGENTS.md standard](https://agents.md/) for cross-tool
 AI agent context. It is consumed by Codex, Jules, Amp, Gemini CLI, Cursor,
@@ -21,10 +21,11 @@ read the files listed above directly.
 
 ## Quick Reference
 
-- **Name**: rice-guard
+- **Name**: riceGuard
+- **Binary**: `rguard`
 - **Language**: Rust (edition 2021, stable toolchain)
 - **Type**: Cross-platform CLI for automated code quality + security scanning
-- **Config file**: `.riceguard.yaml`
+- **Config file**: `.rguard.yaml`
 
 ```bash
 cargo check                        # Type-check all crates

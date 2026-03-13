@@ -34,12 +34,12 @@ pub async fn run(args: ReportArgs) -> anyhow::Result<i32> {
     let target = crate::paths::safe_canonicalize(&args.path);
 
     // ── Step 2: load config ───────────────────────────────────────────────────
-    let config_path = target.join(".riceguard.yaml");
-    let config = match rice_guard_core::config::load(&config_path) {
+    let config_path = target.join(".rguard.yaml");
+    let config = match rguard_core::config::load(&config_path) {
         Ok(c) => c,
-        Err(rice_guard_core::errors::ConfigError::NotFound { .. }) => {
+        Err(rguard_core::errors::ConfigError::NotFound { .. }) => {
             output::print_error(&format!(
-                "No .riceguard.yaml found in {}. Run `rice-guard init` first.",
+                "No .rguard.yaml found in {}. Run `rguard init` first.",
                 target.display()
             ));
             return Ok(2);
@@ -53,7 +53,7 @@ pub async fn run(args: ReportArgs) -> anyhow::Result<i32> {
     // ── Step 3: check sonarqube.enabled ──────────────────────────────────────
     if !config.scanners.sonarqube.enabled {
         output::print_info(
-            "SonarQube integration disabled in .riceguard.yaml \
+            "SonarQube integration disabled in .rguard.yaml \
              (set sonarqube.enabled: true to use report)",
         );
         return Ok(0);
@@ -109,9 +109,7 @@ pub async fn run(args: ReportArgs) -> anyhow::Result<i32> {
                 return Ok(0);
             }
             if msg.contains("HTTP 404") || msg.contains("not found") || msg.contains("404") {
-                output::print_warning(
-                    "Project not found in SonarQube. Run `rice-guard enroll` first.",
-                );
+                output::print_warning("Project not found in SonarQube. Run `rguard enroll` first.");
                 return Ok(0);
             }
             output::print_warning(&format!("Failed to fetch quality gate: {e}"));

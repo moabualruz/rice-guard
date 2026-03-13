@@ -1654,7 +1654,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rice-guard"
+name = "rguard"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1667,8 +1667,8 @@ dependencies = [
  "owo-colors",
  "predicates",
  "reqwest",
- "rice-guard-core",
- "rice-guard-server",
+ "rguard-core",
+ "rguard-server",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -1680,7 +1680,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rice-guard-core"
+name = "rguard-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1719,13 +1719,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "rice-guard-server"
+name = "rguard-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
  "http-body-util",
- "rice-guard-core",
+ "rguard-core",
  "rmcp",
  "schemars",
  "serde",

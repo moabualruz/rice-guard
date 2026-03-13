@@ -7,7 +7,7 @@ use std::process::Command;
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
 
-/// Write a minimal `.riceguard.yaml` into `dir` so that `fix` and `scan` can
+/// Write a minimal `.rguard.yaml` into `dir` so that `fix` and `scan` can
 /// load a valid config without running `init` first.
 fn write_minimal_config(dir: &std::path::Path) {
     let yaml = r#"version: "1"
@@ -29,28 +29,28 @@ scanners:
   scc:
     enabled: false
 "#;
-    std::fs::write(dir.join(".riceguard.yaml"), yaml).expect("failed to write test config");
+    std::fs::write(dir.join(".rguard.yaml"), yaml).expect("failed to write test config");
 }
 
 // ── Additional integration tests (Plan 01-05) ────────────────────────────────
 
-/// `rice-guard scan --help` exits 0 (covers CLI-02 help discoverability).
+/// `rguard scan --help` exits 0 (covers CLI-02 help discoverability).
 #[test]
 fn scan_help_exits_zero() {
-    rice_guard().args(["scan", "--help"]).assert().success();
+    rguard().args(["scan", "--help"]).assert().success();
 }
 
-/// `rice-guard version` (subcommand) exits 0 and stdout contains the package version.
+/// `rguard version` (subcommand) exits 0 and stdout contains the package version.
 #[test]
 fn version_subcommand_contains_pkg_version() {
-    rice_guard()
+    rguard()
         .arg("version")
         .assert()
         .success()
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }
 
-/// `rice-guard init . --yes` with piped (non-TTY) stdin exits 0.
+/// `rguard init . --yes` with piped (non-TTY) stdin exits 0.
 ///
 /// --yes mode must not require a TTY. Pipe empty stdin to ensure no TTY is
 /// allocated. Requires `scc` in PATH; marked `#[ignore]` when running in
@@ -59,7 +59,7 @@ fn version_subcommand_contains_pkg_version() {
 #[ignore = "Requires scc in PATH — run manually or in CI with scc installed"]
 fn init_yes_no_tty_exits_zero() {
     // Use assert_cmd::Command (not std::process::Command) for write_stdin support.
-    assert_cmd::Command::cargo_bin("rice-guard")
+    assert_cmd::Command::cargo_bin("rguard")
         .unwrap()
         .args(["init", ".", "--yes"])
         .write_stdin("")
@@ -67,15 +67,15 @@ fn init_yes_no_tty_exits_zero() {
         .success();
 }
 
-fn rice_guard() -> Command {
-    Command::cargo_bin("rice-guard").unwrap()
+fn rguard() -> Command {
+    Command::cargo_bin("rguard").unwrap()
 }
 
 // ── Help / version tests ────────────────────────────────────────────────────
 
 #[test]
 fn help_lists_all_subcommands() {
-    rice_guard()
+    rguard()
         .arg("--help")
         .assert()
         .success()
@@ -91,7 +91,7 @@ fn help_lists_all_subcommands() {
 
 #[test]
 fn init_help_shows_yes_and_dry_run() {
-    rice_guard()
+    rguard()
         .args(["init", "--help"])
         .assert()
         .success()
@@ -101,41 +101,41 @@ fn init_help_shows_yes_and_dry_run() {
 
 #[test]
 fn version_flag_prints_version() {
-    rice_guard()
+    rguard()
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::is_match(r"rice-guard \d+\.\d+\.\d+").unwrap());
+        .stdout(predicate::str::is_match(r"rguard \d+\.\d+\.\d+").unwrap());
 }
 
 // ── Stub subcommand tests ───────────────────────────────────────────────────
 
 #[test]
 fn scan_missing_config_exits_two() {
-    // With no .riceguard.yaml in the target dir, scan exits 2 (tool error)
+    // With no .rguard.yaml in the target dir, scan exits 2 (tool error)
     // and prints a helpful "run init" message to stderr.
     let tmp = tempfile::tempdir().unwrap();
-    rice_guard()
+    rguard()
         .args(["scan", tmp.path().to_str().unwrap()])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("rice-guard init"));
+        .stderr(predicate::str::contains("rguard init"));
 }
 
 #[test]
 fn fix_no_config_exits_two() {
-    // Running `fix` without a .riceguard.yaml exits 2 with a helpful message.
+    // Running `fix` without a .rguard.yaml exits 2 with a helpful message.
     // Uses the crate root (no config) as the target directory.
-    rice_guard()
+    rguard()
         .args(["fix", "."])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("No .riceguard.yaml"));
+        .stderr(predicate::str::contains("No .rguard.yaml"));
 }
 
 #[test]
 fn status_not_implemented_exits_zero() {
-    rice_guard()
+    rguard()
         .args(["status", "."])
         .assert()
         .success()
@@ -146,50 +146,50 @@ fn status_not_implemented_exits_zero() {
 fn serve_help_exits_zero() {
     // `serve` is fully implemented (Phase 5) — it starts the REST API server.
     // Running without --help would block, so we test help output instead.
-    rice_guard()
+    rguard()
         .args(["serve", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("serve"));
 }
 
-/// `rice-guard enroll --help` exits 0 — verifies the enroll subcommand is discoverable.
+/// `rguard enroll --help` exits 0 — verifies the enroll subcommand is discoverable.
 #[test]
 fn enroll_help_exits_zero() {
-    rice_guard().args(["enroll", "--help"]).assert().success();
+    rguard().args(["enroll", "--help"]).assert().success();
 }
 
-/// `rice-guard report --help` exits 0 — verifies the report subcommand is discoverable.
+/// `rguard report --help` exits 0 — verifies the report subcommand is discoverable.
 #[test]
 fn report_help_exits_zero() {
-    rice_guard().args(["report", "--help"]).assert().success();
+    rguard().args(["report", "--help"]).assert().success();
 }
 
 // ── Version subcommand tests ────────────────────────────────────────────────
 
 #[test]
 fn version_subcommand_prints_version() {
-    rice_guard()
+    rguard()
         .arg("version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("rice-guard"));
+        .stdout(predicate::str::contains("rguard"));
 }
 
 #[test]
 fn version_completions_bash_outputs_script() {
-    rice_guard()
+    rguard()
         .args(["version", "--completions", "bash"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("rice-guard"));
+        .stdout(predicate::str::contains("rguard"));
 }
 
 // ── Exit code tests ─────────────────────────────────────────────────────────
 
 #[test]
 fn scan_help_shows_flags() {
-    rice_guard()
+    rguard()
         .args(["scan", "--help"])
         .assert()
         .success()
@@ -199,7 +199,7 @@ fn scan_help_shows_flags() {
 
 #[test]
 fn fix_help_shows_flags() {
-    rice_guard()
+    rguard()
         .args(["fix", "--help"])
         .assert()
         .success()
@@ -209,7 +209,7 @@ fn fix_help_shows_flags() {
 
 #[test]
 fn fix_help_shows_new_flags() {
-    rice_guard()
+    rguard()
         .args(["fix", "--help"])
         .assert()
         .success()
@@ -222,7 +222,7 @@ fn fix_help_shows_new_flags() {
 
 #[test]
 fn serve_help_shows_port_flag() {
-    rice_guard()
+    rguard()
         .args(["serve", "--help"])
         .assert()
         .success()
@@ -235,7 +235,7 @@ fn serve_help_shows_port_flag() {
 /// Covers FIX-03, FIX-06, FIX-07, FIX-10, FIX-11.
 #[test]
 fn fix_help_shows_all_flags() {
-    rice_guard()
+    rguard()
         .args(["fix", "--help"])
         .assert()
         .success()
@@ -259,7 +259,7 @@ fn fix_help_shows_all_flags() {
 fn fix_dry_run_exits_zero() {
     let dir = tempfile::tempdir().unwrap();
     write_minimal_config(dir.path());
-    rice_guard()
+    rguard()
         .args(["fix", dir.path().to_str().unwrap(), "--dry-run"])
         .assert()
         .code(0);
@@ -271,7 +271,7 @@ fn fix_dry_run_exits_zero() {
 fn fix_dry_run_writes_report() {
     let dir = tempfile::tempdir().unwrap();
     write_minimal_config(dir.path());
-    rice_guard()
+    rguard()
         .args(["fix", dir.path().to_str().unwrap(), "--dry-run"])
         .assert()
         .code(0);
@@ -303,12 +303,12 @@ fn fix_unsafe_without_yes_non_tty_exits_two() {
     let dir = tempfile::tempdir().unwrap();
     write_minimal_config(dir.path());
     // Pipe stdin to simulate non-TTY
-    let output = Command::cargo_bin("rice-guard")
+    let output = Command::cargo_bin("rguard")
         .unwrap()
         .args(["fix", dir.path().to_str().unwrap(), "--unsafe"])
         .stdin(std::process::Stdio::piped())
         .output()
-        .expect("failed to spawn rice-guard");
+        .expect("failed to spawn rguard");
     assert_eq!(
         output.status.code(),
         Some(2),
@@ -332,7 +332,7 @@ fn fix_unsafe_without_yes_non_tty_exits_two() {
 #[test]
 fn converter_severity_mapping() {
     // Severity mapping is tested via unit tests in converter.rs.
-    // This stub exists so `cargo test -p rice-guard-cli converter` finds named tests.
+    // This stub exists so `cargo test -p rguard converter` finds named tests.
     // See: commands::sonar::converter::tests::severity_maps_*
 }
 
@@ -396,27 +396,27 @@ fn sonar_report_quality_gate() {
 
 #[test]
 fn completions_bash_generates_output() {
-    rice_guard()
+    rguard()
         .args(["version", "--completions", "bash"])
         .assert()
         .success()
         .stdout(predicate::str::is_empty().not())
-        .stdout(predicate::str::contains("rice-guard"));
+        .stdout(predicate::str::contains("rguard"));
 }
 
 #[test]
 fn completions_zsh_generates_output() {
-    rice_guard()
+    rguard()
         .args(["version", "--completions", "zsh"])
         .assert()
         .success()
         .stdout(predicate::str::is_empty().not())
-        .stdout(predicate::str::contains("rice-guard"));
+        .stdout(predicate::str::contains("rguard"));
 }
 
 #[test]
 fn completions_fish_generates_output() {
-    rice_guard()
+    rguard()
         .args(["version", "--completions", "fish"])
         .assert()
         .success()
@@ -426,7 +426,7 @@ fn completions_fish_generates_output() {
 
 #[test]
 fn completions_powershell_generates_output() {
-    rice_guard()
+    rguard()
         .args(["version", "--completions", "powershell"])
         .assert()
         .success()
@@ -440,7 +440,7 @@ fn completions_powershell_generates_output() {
 fn fix_formatters_stage_filter() {
     let dir = tempfile::tempdir().unwrap();
     write_minimal_config(dir.path());
-    rice_guard()
+    rguard()
         .args([
             "fix",
             dir.path().to_str().unwrap(),

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-/// Errors when loading or validating the `.riceguard.yaml` config file.
+/// Errors when loading or validating the `.rguard.yaml` config file.
 #[derive(Debug, Error)]
 pub enum ConfigError {
     /// Config file does not exist at the given path.

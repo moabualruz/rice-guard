@@ -1,14 +1,14 @@
 {
-  "name": "rice-guard",
+  "name": "rguard",
   "version": "0.1.0",
   "description": "Cross-platform code quality, security scanning, and deterministic auto-fixing",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/user/rice-guard"
+    "url": "https://github.com/rice-guard/rguard"
   },
   "bin": {
-    "rice-guard": "bin/rice-guard"
+    "rguard": "bin/rguard"
   },
   "scripts": {
     "postinstall": "node install.js"

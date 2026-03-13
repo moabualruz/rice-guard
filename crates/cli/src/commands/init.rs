@@ -1,12 +1,12 @@
 /// Init subcommand handler.
 ///
-/// Orchestrates the 3-step detection pipeline from `rice_guard_core::init`:
+/// Orchestrates the 3-step detection pipeline from `rguard_core::init`:
 ///   1. detect() — scc language detection + tool probing
 ///   2. wizard() / noninteractive_choices() — interactive or default choices
-///   3. generate() — write .riceguard.yaml and optional CI/pre-commit configs
+///   3. generate() — write .rguard.yaml and optional CI/pre-commit configs
 use crate::args::InitArgs;
 use crate::output;
-use rice_guard_core::init::{DetectionResult, GeneratorInput};
+use rguard_core::init::{DetectionResult, GeneratorInput};
 use std::path::PathBuf;
 
 /// Run the init subcommand.
@@ -18,14 +18,14 @@ pub async fn run(args: InitArgs) -> anyhow::Result<i32> {
 
     output::print_info("Detecting project languages and available tools...");
 
-    let detection = rice_guard_core::init::detect(&project_path)
+    let detection = rguard_core::init::detect(&project_path)
         .await
         .map_err(|e| anyhow::anyhow!("Detection failed: {e}"))?;
 
     let choices = if args.yes {
-        rice_guard_core::init::noninteractive_choices(&detection)
+        rguard_core::init::noninteractive_choices(&detection)
     } else {
-        rice_guard_core::init::wizard(&detection).map_err(|e| anyhow::anyhow!("{e}"))?
+        rguard_core::init::wizard(&detection).map_err(|e| anyhow::anyhow!("{e}"))?
     };
 
     let project_name = project_path
@@ -43,11 +43,11 @@ pub async fn run(args: InitArgs) -> anyhow::Result<i32> {
 
     if args.dry_run {
         output::print_info("Dry run — files that would be generated:");
-        output::print_info("  .riceguard.yaml");
+        output::print_info("  .rguard.yaml");
         return Ok(0);
     }
 
-    let created = rice_guard_core::init::generate(&input)
+    let created = rguard_core::init::generate(&input)
         .await
         .map_err(|e| anyhow::anyhow!("Generation failed: {e}"))?;
 
@@ -57,7 +57,7 @@ pub async fn run(args: InitArgs) -> anyhow::Result<i32> {
 
 /// Print a summary table after successful init.
 fn print_init_summary(detection: &DetectionResult, created: &[PathBuf]) {
-    output::print_success("\nrice-guard initialized successfully!\n");
+    output::print_success("\nrguard initialized successfully!\n");
 
     // Languages detected
     if detection.languages.is_empty() {
@@ -76,7 +76,7 @@ fn print_init_summary(detection: &DetectionResult, created: &[PathBuf]) {
         .filter(|(_, result)| {
             matches!(
                 result,
-                rice_guard_core::registry::probe::ProbeResult::Available { .. }
+                rguard_core::registry::probe::ProbeResult::Available { .. }
             )
         })
         .map(|(name, _)| name.as_str())
@@ -88,7 +88,7 @@ fn print_init_summary(detection: &DetectionResult, created: &[PathBuf]) {
         .filter(|(_, result)| {
             !matches!(
                 result,
-                rice_guard_core::registry::probe::ProbeResult::Available { .. }
+                rguard_core::registry::probe::ProbeResult::Available { .. }
             )
         })
         .map(|(name, _)| name.as_str())
@@ -115,5 +115,5 @@ fn print_init_summary(detection: &DetectionResult, created: &[PathBuf]) {
         }
     }
 
-    output::print_info("\nRun `rice-guard scan .` to scan your project.");
+    output::print_info("\nRun `rguard scan .` to scan your project.");
 }

@@ -47,7 +47,7 @@ pub async fn start_server(port: u16, working_dir: PathBuf) -> anyhow::Result<()>
     let addr = format!("127.0.0.1:{port}");
     let state = AppState { working_dir };
 
-    println!("rice-guard serving on http://{addr}");
+    println!("rguard serving on http://{addr}");
     println!("  GET  http://{addr}/api/v1/health");
     println!("  POST http://{addr}/api/v1/scan");
     println!("  GET  http://{addr}/api/v1/issues");
@@ -76,7 +76,7 @@ mod tests {
         AppState { working_dir }
     }
 
-    /// Write a minimal .riceguard.yaml into a temp directory.
+    /// Write a minimal .rguard.yaml into a temp directory.
     fn write_minimal_config(dir: &std::path::Path) {
         let yaml = r#"version: "1"
 project:
@@ -97,7 +97,7 @@ scanners:
   scc:
     enabled: false
 "#;
-        std::fs::write(dir.join(".riceguard.yaml"), yaml).expect("failed to write test config");
+        std::fs::write(dir.join(".rguard.yaml"), yaml).expect("failed to write test config");
     }
 
     /// Create a minimal fixture reports directory with issues.json + summary.json.
@@ -136,7 +136,7 @@ scanners:
                         "complexity": "trivial"
                     },
                     "verification": {
-                        "rerun_command": "rice-guard scan .",
+                        "rerun_command": "rguard scan .",
                         "success_condition": "no findings"
                     },
                     "priority_score": 20,

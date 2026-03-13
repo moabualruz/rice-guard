@@ -17,7 +17,7 @@ pub mod tools;
 
 use std::path::PathBuf;
 
-use server::RiceGuardMcpServer;
+use server::RGuardMcpServer;
 
 /// Run the MCP stdio server.
 ///
@@ -45,7 +45,7 @@ pub async fn run_mcp_server(working_dir: PathBuf) -> anyhow::Result<()> {
         )
         .init();
 
-    let server = RiceGuardMcpServer::new(working_dir);
+    let server = RGuardMcpServer::new(working_dir);
     let service = server
         .serve(rmcp::transport::io::stdio())
         .await
@@ -56,15 +56,15 @@ pub async fn run_mcp_server(working_dir: PathBuf) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::server::RiceGuardMcpServer;
+    use super::server::RGuardMcpServer;
     use super::tools::{FixAllParams, ScanProjectParams};
     use std::path::PathBuf;
 
     #[test]
     fn mcp_server_init_no_panic() {
-        // RiceGuardMcpServer::new() must not panic or perform any I/O.
+        // RGuardMcpServer::new() must not panic or perform any I/O.
         // The ToolRouter is constructed in-memory only.
-        let _server = RiceGuardMcpServer::new(PathBuf::from("."));
+        let _server = RGuardMcpServer::new(PathBuf::from("."));
     }
 
     /// `ScanProjectParams` must deserialize correctly with `include_ignored: true`.
@@ -102,7 +102,7 @@ mod tests {
         // We verify this by construction: new() only initializes a ToolRouter
         // (a HashMap of function pointers) and stores the working_dir PathBuf.
         // No I/O operations occur during struct construction.
-        let server = RiceGuardMcpServer::new(PathBuf::from("/tmp"));
+        let server = RGuardMcpServer::new(PathBuf::from("/tmp"));
         assert_eq!(server.working_dir, PathBuf::from("/tmp"));
     }
 
@@ -113,7 +113,7 @@ mod tests {
         // the tracing subscriber in run_mcp_server() is initialized with
         // std::io::stderr before any other output.
         //
-        // Manual verification: `rice-guard mcp 2>/dev/null | head -1`
+        // Manual verification: `rguard mcp 2>/dev/null | head -1`
         // must produce {"jsonrpc":"2.0",...} on stdout (valid JSON-RPC).
         assert!(
             true,
@@ -126,16 +126,16 @@ mod tests {
     async fn mcp_scan_tool_returns_json() {
         // This test requires real scanner binaries to be present in PATH.
         // It exercises the full scan tool call through the MCP protocol layer.
-        // Run manually: cargo test -p rice-guard-server mcp_scan_tool -- --ignored
+        // Run manually: cargo test -p rguard-server mcp_scan_tool -- --ignored
         todo!()
     }
 
     #[tokio::test]
-    #[ignore = "integration: requires MCP client (Claude Code or Cursor) — test manually via `rice-guard mcp`"]
+    #[ignore = "integration: requires MCP client (Claude Code or Cursor) — test manually via `rguard mcp`"]
     async fn mcp_get_issues_returns_array() {
         // This test requires a live MCP client connecting over stdin/stdout.
         // It exercises the get_issues tool through the full JSON-RPC transport.
-        // Run manually: configure rice-guard as an MCP server in Claude Code or Cursor.
+        // Run manually: configure rguard as an MCP server in Claude Code or Cursor.
         todo!()
     }
 }

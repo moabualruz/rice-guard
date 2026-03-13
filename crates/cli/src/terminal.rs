@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
-use rice_guard_core::fixer::FixReport;
+use rguard_core::fixer::FixReport;
 
 /// Returns `true` when stdout is a TTY (interactive terminal).
 ///
@@ -314,7 +314,7 @@ pub fn print_unsafe_warning_banner(tool_names: &[String]) {
 ///
 /// * `report` — the completed (or partial) [`FixReport`].
 pub fn print_fix_summary_table(report: &FixReport) {
-    use rice_guard_core::fixer::FixToolStatus;
+    use rguard_core::fixer::FixToolStatus;
 
     let tty = is_tty();
 

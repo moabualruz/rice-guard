@@ -1,4 +1,4 @@
-use crate::config::model::RiceGuardConfig;
+use crate::config::model::RGuardConfig;
 
 /// Per-tool exclude flag arguments derived from active ignore patterns.
 ///
@@ -72,7 +72,7 @@ impl ExcludeArgs {
     /// with `config.filters.exclude` (deduped, config values appended after defaults).
     ///
     /// Does NOT include `filters.include` — those are rescues, not excludes.
-    pub fn collect_active_patterns(config: &RiceGuardConfig) -> Vec<String> {
+    pub fn collect_active_patterns(config: &RGuardConfig) -> Vec<String> {
         use crate::config::model::FiltersConfig;
 
         let mut seen = std::collections::HashSet::new();
@@ -98,8 +98,8 @@ mod tests {
     use super::*;
     use crate::config::model::FiltersConfig;
 
-    fn cfg_with_excludes(excludes: Vec<&str>) -> RiceGuardConfig {
-        let mut c = RiceGuardConfig::default();
+    fn cfg_with_excludes(excludes: Vec<&str>) -> RGuardConfig {
+        let mut c = RGuardConfig::default();
         c.filters.exclude = excludes.into_iter().map(String::from).collect();
         c
     }
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn collect_active_patterns_does_not_include_filters_include() {
-        let mut config = RiceGuardConfig::default();
+        let mut config = RGuardConfig::default();
         config.filters.include = vec!["src/**".to_string()];
         config.filters.exclude = vec![];
         let patterns = ExcludeArgs::collect_active_patterns(&config);

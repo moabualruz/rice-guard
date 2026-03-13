@@ -1,9 +1,9 @@
 /// Integration tests for descriptor loading, validation, and command building.
 ///
-/// These tests exercise the public API of `rice_guard_core::registry`
+/// These tests exercise the public API of `rguard_core::registry`
 /// using temporary directories and fixture files.
-use rice_guard_core::errors::DescriptorError;
-use rice_guard_core::registry::{loader, probe};
+use rguard_core::errors::DescriptorError;
+use rguard_core::registry::{loader, probe};
 use tempfile::TempDir;
 
 // ── load_scanner_descriptors ─────────────────────────────────────────────────
@@ -121,7 +121,7 @@ fn custom_scanner_fixture_parses() {
     // Load the valid custom-scanner fixture from the test fixtures directory.
     let fixture_yaml =
         include_str!("../../../tests/fixtures/descriptors/valid/custom-scanner.yaml");
-    use rice_guard_core::registry::scanner_descriptor::ScannerDescriptor;
+    use rguard_core::registry::scanner_descriptor::ScannerDescriptor;
     let desc: ScannerDescriptor =
         serde_yaml_ng::from_str(fixture_yaml).expect("valid custom-scanner fixture must parse");
     assert_eq!(desc.name, "custom-linter");

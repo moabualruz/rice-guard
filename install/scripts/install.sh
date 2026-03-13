@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# rice-guard installer — detects OS/arch and downloads the correct binary.
+# rguard installer — detects OS/arch and downloads the correct binary.
 set -euo pipefail
 
-REPO="user/rice-guard"  # TODO: update to real GitHub owner
-VERSION="${RICE_GUARD_VERSION:-latest}"
-INSTALL_DIR="${RICE_GUARD_INSTALL_DIR:-$HOME/.local/bin}"
+REPO="rice-guard/rguard"  # TODO: update to real GitHub owner
+VERSION="${RGUARD_VERSION:-latest}"
+INSTALL_DIR="${RGUARD_INSTALL_DIR:-$HOME/.local/bin}"
 
 detect_target() {
     local os arch
@@ -36,9 +36,9 @@ detect_target() {
 get_download_url() {
     local target="$1"
     if [ "$VERSION" = "latest" ]; then
-        echo "https://github.com/$REPO/releases/latest/download/rice-guard-${target}.tar.gz"
+        echo "https://github.com/$REPO/releases/latest/download/rguard-${target}.tar.gz"
     else
-        echo "https://github.com/$REPO/releases/download/v${VERSION}/rice-guard-${target}.tar.gz"
+        echo "https://github.com/$REPO/releases/download/v${VERSION}/rguard-${target}.tar.gz"
     fi
 }
 
@@ -47,25 +47,25 @@ main() {
     target="$(detect_target)"
     url="$(get_download_url "$target")"
 
-    echo "Installing rice-guard for $target..."
+    echo "Installing rguard for $target..."
     echo "  From: $url"
-    echo "  To:   $INSTALL_DIR/rice-guard"
+    echo "  To:   $INSTALL_DIR/rguard"
 
     tmpdir="$(mktemp -d)"
     trap 'rm -rf "$tmpdir"' EXIT
 
-    curl -fsSL "$url" -o "$tmpdir/rice-guard.tar.gz"
-    tar xzf "$tmpdir/rice-guard.tar.gz" -C "$tmpdir"
+    curl -fsSL "$url" -o "$tmpdir/rguard.tar.gz"
+    tar xzf "$tmpdir/rguard.tar.gz" -C "$tmpdir"
 
     mkdir -p "$INSTALL_DIR"
-    mv "$tmpdir/rice-guard" "$INSTALL_DIR/rice-guard"
-    chmod +x "$INSTALL_DIR/rice-guard"
+    mv "$tmpdir/rguard" "$INSTALL_DIR/rguard"
+    chmod +x "$INSTALL_DIR/rguard"
 
     echo ""
-    if command -v rice-guard &>/dev/null; then
-        echo "Installed: $(rice-guard version 2>/dev/null || echo 'rice-guard')"
+    if command -v rguard &>/dev/null; then
+        echo "Installed: $(rguard version 2>/dev/null || echo 'rguard')"
     else
-        echo "Installed to $INSTALL_DIR/rice-guard"
+        echo "Installed to $INSTALL_DIR/rguard"
         echo "Add $INSTALL_DIR to your PATH if not already present."
     fi
 }

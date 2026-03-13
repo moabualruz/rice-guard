@@ -1,4 +1,4 @@
-# rice-guard — Gemini CLI Context
+# riceGuard — Gemini CLI Context
 
 All shared instructions live in `.ai/instructions/` and are loaded via
 `@` imports below. Edit the shared files — not this file — for content

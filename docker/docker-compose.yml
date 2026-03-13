@@ -1,4 +1,4 @@
-# SonarQube CE + PostgreSQL for rice-guard integration.
+# SonarQube CE + PostgreSQL for rguard integration.
 # Linux prerequisite: sudo sysctl -w vm.max_map_count=524288
 # Usage: docker compose up -d
 # UI: http://localhost:${SONARQUBE_PORT:-9000} (default admin/admin, change on first login)

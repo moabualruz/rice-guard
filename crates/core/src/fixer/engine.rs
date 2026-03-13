@@ -5,7 +5,7 @@
 /// Each stage runs all applicable tools before advancing to the next.
 use std::time::Instant;
 
-use crate::config::RiceGuardConfig;
+use crate::config::RGuardConfig;
 use crate::fixer::report::FixReport;
 use crate::fixer::runner::{run_one_fixer, RunnerConfig};
 use crate::fixer::stage_filter::{StageFilter, PIPELINE_STAGES};
@@ -37,13 +37,13 @@ pub struct FixerEngineConfig {
 
 /// Orchestrates the full deterministic fix pipeline.
 pub struct FixerEngine {
-    config: RiceGuardConfig,
+    config: RGuardConfig,
     registry: DescriptorRegistry,
 }
 
 impl FixerEngine {
     /// Construct a new engine from the project config and descriptor registry.
-    pub fn new(config: RiceGuardConfig, registry: DescriptorRegistry) -> Self {
+    pub fn new(config: RGuardConfig, registry: DescriptorRegistry) -> Self {
         Self { config, registry }
     }
 
@@ -129,7 +129,7 @@ impl FixerEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::RiceGuardConfig;
+    use crate::config::RGuardConfig;
     use crate::registry::fixer_descriptor::{FixerDescriptor, FixerStages, FixerStep};
 
     fn make_step(name: &str, safe: bool) -> FixerStep {
@@ -157,8 +157,8 @@ mod tests {
         }
     }
 
-    fn default_config() -> RiceGuardConfig {
-        let mut cfg = RiceGuardConfig::default();
+    fn default_config() -> RGuardConfig {
+        let mut cfg = RGuardConfig::default();
         cfg.project.name = "test-project".to_string();
         cfg
     }

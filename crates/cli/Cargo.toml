@@ -1,17 +1,17 @@
 [package]
-name = "rice-guard"
+name = "rguard"
 description = "Cross-platform code quality, security scanning, and deterministic auto-fixing"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "rice-guard"
+name = "rguard"
 path = "src/main.rs"
 
 [dependencies]
-rice-guard-core.workspace = true
-rice-guard-server.workspace = true
+rguard-core.workspace = true
+rguard-server.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
 inquire.workspace = true

@@ -2,16 +2,16 @@ use std::path::{Path, PathBuf};
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 
-use crate::config::model::RiceGuardConfig;
+use crate::config::model::RGuardConfig;
 
-use super::sources::{global_ignore_path, RGIGNORE, RICEGUARDIGNORE};
+use super::sources::{global_ignore_path, RGIGNORE, RGUARDIGNORE};
 
 /// Compiled ignore engine built from all 5 sources in priority order:
 ///
 /// 1. Built-in defaults (vendor/, node_modules/, target/, .git/, etc.)
-/// 2. Global ignore file (`~/.config/riceguard/ignore`)
+/// 2. Global ignore file (`~/.config/rguard/ignore`)
 /// 3. `.gitignore` (only if `respect_gitignore = true`)
-/// 4. `.riceguardignore` or `.rgignore` (project-level, riceguardignore takes precedence)
+/// 4. `.rguardignore` or `.rgignore` (project-level, rguardignore takes precedence)
 /// 5. `config.filters.exclude` patterns from YAML config
 /// 6. `config.filters.include` patterns as `!` negations (rescues)
 pub struct IgnoreEngine {
@@ -27,7 +27,7 @@ impl IgnoreEngine {
     /// passed explicitly here to make callers clear about the override.
     pub fn build(
         root: &Path,
-        config: &RiceGuardConfig,
+        config: &RGuardConfig,
         respect_gitignore: bool,
     ) -> Result<Self, ignore::Error> {
         let mut builder = GitignoreBuilder::new(root);
@@ -64,17 +64,17 @@ impl IgnoreEngine {
             }
         }
 
-        // ── Layer 4: .riceguardignore or .rgignore ──────────────────────────
-        // .riceguardignore takes precedence: if it exists, skip .rgignore.
-        let riceguardignore_path = root.join(RICEGUARDIGNORE);
+        // ── Layer 4: .rguardignore or .rgignore ──────────────────────────
+        // .rguardignore takes precedence: if it exists, skip .rgignore.
+        let rguardignore_path = root.join(RGUARDIGNORE);
         let rgignore_path = root.join(RGIGNORE);
 
-        if riceguardignore_path.exists() {
-            if let Some(err) = builder.add(&riceguardignore_path) {
+        if rguardignore_path.exists() {
+            if let Some(err) = builder.add(&rguardignore_path) {
                 tracing::warn!(
-                    path = %riceguardignore_path.display(),
+                    path = %rguardignore_path.display(),
                     error = %err,
-                    "failed to load .riceguardignore"
+                    "failed to load .rguardignore"
                 );
             }
         } else if rgignore_path.exists() {
@@ -150,8 +150,8 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    fn empty_config() -> RiceGuardConfig {
-        let mut c = RiceGuardConfig::default();
+    fn empty_config() -> RGuardConfig {
+        let mut c = RGuardConfig::default();
         c.filters.exclude = vec![];
         c.filters.include = vec![];
         c
@@ -211,18 +211,18 @@ mod tests {
     }
 
     #[test]
-    fn riceguardignore_patterns_are_applied() {
-        let dir = make_project(&[(".riceguardignore", "logs/\n")]);
+    fn rguardignore_patterns_are_applied() {
+        let dir = make_project(&[(".rguardignore", "logs/\n")]);
         let config = empty_config();
         let engine = IgnoreEngine::build(dir.path(), &config, false).expect("build");
 
         assert!(
             engine.is_ignored(&dir.path().join("logs"), true),
-            "logs/ should be ignored via .riceguardignore"
+            "logs/ should be ignored via .rguardignore"
         );
         assert!(
             engine.is_ignored(&dir.path().join("logs/app.log"), false),
-            "logs/app.log should be ignored via .riceguardignore"
+            "logs/app.log should be ignored via .rguardignore"
         );
         assert!(
             !engine.is_ignored(&dir.path().join("src/main.rs"), false),
@@ -231,7 +231,7 @@ mod tests {
     }
 
     #[test]
-    fn rgignore_loaded_when_no_riceguardignore() {
+    fn rgignore_loaded_when_no_rguardignore() {
         let dir = make_project(&[(".rgignore", "coverage/\n")]);
         let config = empty_config();
         let engine = IgnoreEngine::build(dir.path(), &config, false).expect("build");
@@ -243,23 +243,20 @@ mod tests {
     }
 
     #[test]
-    fn riceguardignore_takes_precedence_over_rgignore() {
-        // .riceguardignore excludes "logs/"; .rgignore excludes "coverage/".
-        // When both exist, only .riceguardignore should be loaded.
-        let dir = make_project(&[
-            (".riceguardignore", "logs/\n"),
-            (".rgignore", "coverage/\n"),
-        ]);
+    fn rguardignore_takes_precedence_over_rgignore() {
+        // .rguardignore excludes "logs/"; .rgignore excludes "coverage/".
+        // When both exist, only .rguardignore should be loaded.
+        let dir = make_project(&[(".rguardignore", "logs/\n"), (".rgignore", "coverage/\n")]);
         let config = empty_config();
         let engine = IgnoreEngine::build(dir.path(), &config, false).expect("build");
 
         assert!(
             engine.is_ignored(&dir.path().join("logs"), true),
-            "logs/ should be ignored (from .riceguardignore)"
+            "logs/ should be ignored (from .rguardignore)"
         );
         assert!(
             !engine.is_ignored(&dir.path().join("coverage"), true),
-            "coverage/ should NOT be ignored (.rgignore skipped when .riceguardignore exists)"
+            "coverage/ should NOT be ignored (.rgignore skipped when .rguardignore exists)"
         );
     }
 
@@ -289,7 +286,7 @@ mod tests {
 
     #[test]
     fn negation_pattern_rescues_file_from_built_in_defaults() {
-        let dir = make_project(&[(".riceguardignore", "!vendor/important.go\n")]);
+        let dir = make_project(&[(".rguardignore", "!vendor/important.go\n")]);
         let config = empty_config();
         let engine = IgnoreEngine::build(dir.path(), &config, false).expect("build");
 

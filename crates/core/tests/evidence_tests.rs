@@ -9,8 +9,8 @@
 
 #[cfg(test)]
 mod evidence_tests {
-    use rice_guard_core::issue::{EvidenceExtractor, Issue};
-    use rice_guard_core::scanner::parser::RawFinding;
+    use rguard_core::issue::{EvidenceExtractor, Issue};
+    use rguard_core::scanner::parser::RawFinding;
 
     // ─── helper to build a minimal RawFinding ────────────────────────────────
 
@@ -417,7 +417,7 @@ mod evidence_tests {
     /// EVID-05 — running the same scan twice produces identical issue IDs.
     #[test]
     fn fingerprint_stable_across_runs() {
-        use rice_guard_core::issue::fingerprint;
+        use rguard_core::issue::fingerprint;
         let id1 = fingerprint("semgrep.eval", "src/app.py", "eval(x)");
         let id2 = fingerprint("semgrep.eval", "src/app.py", "eval(x)");
         assert_eq!(id1, id2, "fingerprint must be deterministic");
@@ -427,7 +427,7 @@ mod evidence_tests {
     /// because IDs are based on rule_id + path + matched_code, not line number.
     #[test]
     fn fingerprint_stable_after_formatter_shift() {
-        use rice_guard_core::issue::fingerprint;
+        use rguard_core::issue::fingerprint;
         // Same code, different line (formatter shifted it).
         let id_before = fingerprint("semgrep.eval", "src/app.py", "eval(x)");
         let id_after = fingerprint("semgrep.eval", "src/app.py", "eval(x)");
@@ -444,7 +444,7 @@ mod evidence_tests {
     fn issue_struct_has_required_fields() {
         // This is a compile-time check via struct construction.
         // If any field is missing or renamed, this test will fail to compile.
-        use rice_guard_core::issue::{EvidenceBlock, FixComplexity, FixMetadata, VerificationInfo};
+        use rguard_core::issue::{EvidenceBlock, FixComplexity, FixMetadata, VerificationInfo};
 
         let evidence = EvidenceBlock {
             matched_code: String::new(),
@@ -464,7 +464,7 @@ mod evidence_tests {
         };
 
         let verification = VerificationInfo {
-            rerun_command: "rice-guard scan .".to_string(),
+            rerun_command: "rguard scan .".to_string(),
             success_condition: "exit 0 with no findings".to_string(),
         };
 

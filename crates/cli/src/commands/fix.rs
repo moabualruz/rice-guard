@@ -12,9 +12,9 @@
 ///   without `--yes` in a non-TTY environment.
 use std::time::Instant;
 
-use rice_guard_core::fixer::engine::FixerEngineConfig;
-use rice_guard_core::fixer::{FixReport, FixerEngine, StageFilter};
-use rice_guard_core::registry::DescriptorRegistry;
+use rguard_core::fixer::engine::FixerEngineConfig;
+use rguard_core::fixer::{FixReport, FixerEngine, StageFilter};
+use rguard_core::registry::DescriptorRegistry;
 
 use crate::args::FixArgs;
 use crate::output;
@@ -28,12 +28,12 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
     let project_root = crate::paths::safe_canonicalize(&args.path);
 
     // ── Step 2: load config ───────────────────────────────────────────────────
-    let config_path = project_root.join(".riceguard.yaml");
-    let config = match rice_guard_core::config::load(&config_path) {
+    let config_path = project_root.join(".rguard.yaml");
+    let config = match rguard_core::config::load(&config_path) {
         Ok(c) => c,
-        Err(rice_guard_core::errors::ConfigError::NotFound { .. }) => {
+        Err(rguard_core::errors::ConfigError::NotFound { .. }) => {
             output::print_error(&format!(
-                "No .riceguard.yaml found in {}. Run `rice-guard init` first.",
+                "No .rguard.yaml found in {}. Run `rguard init` first.",
                 project_root.display()
             ));
             return Ok(2);
@@ -46,7 +46,7 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
 
     // ── Step 3: load fixer descriptors ───────────────────────────────────────
     let fixer_descriptors =
-        match rice_guard_core::registry::loader::load_fixer_descriptors(&project_root) {
+        match rguard_core::registry::loader::load_fixer_descriptors(&project_root) {
             Ok(d) => d,
             Err(e) => {
                 tracing::warn!(
@@ -165,7 +165,7 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
             if !is_tty() {
                 output::print_error(
                     "error: --unsafe requires --yes to skip confirmation in non-TTY (CI) mode\n\
-                     Use: rice-guard fix --unsafe --yes",
+                     Use: rguard fix --unsafe --yes",
                 );
                 return Ok(2);
             }
@@ -185,8 +185,7 @@ pub async fn run(args: FixArgs) -> anyhow::Result<i32> {
     let reports_base = project_root.join("reports").to_string_lossy().to_string();
 
     let fix_prefix = format!("fix-{}", config.project.name);
-    let fix_output_dir = match rice_guard_core::scanner::OutputDir::new(&fix_prefix, &reports_base)
-    {
+    let fix_output_dir = match rguard_core::scanner::OutputDir::new(&fix_prefix, &reports_base) {
         Ok(d) => d,
         Err(e) => {
             output::print_error(&format!("Failed to create fix output directory: {e}"));

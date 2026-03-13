@@ -1,8 +1,8 @@
-# rice-guard scan — AI Agent Skill
+# rguard scan — AI Agent Skill
 
 ## Name
 
-`rice-guard-scan` — Code quality and security scanning with AI-ready output.
+`rguard-scan` — Code quality and security scanning with AI-ready output.
 
 ## Description
 
@@ -19,8 +19,8 @@ consume directly — no need to read source files.
 
 ## Prerequisites
 
-- `rice-guard` binary installed
-- `.riceguard.yaml` config exists (run `rice-guard init` first)
+- `rguard` binary installed
+- `.rguard.yaml` config exists (run `rguard init` first)
 - External scanners installed as needed (Semgrep, Trivy, Gitleaks, etc.)
 
 ## Commands
@@ -28,25 +28,25 @@ consume directly — no need to read source files.
 ### Full scan (all enabled scanners)
 
 ```bash
-rice-guard scan [path]
+rguard scan [path]
 ```
 
 ### Quick scan (jscpd + scc + Semgrep + Trivy)
 
 ```bash
-rice-guard scan [path] --quick
+rguard scan [path] --quick
 ```
 
 ### Security-focused scan (Semgrep + Trivy + Gitleaks)
 
 ```bash
-rice-guard scan [path] --security
+rguard scan [path] --security
 ```
 
 ### Hold-the-line (new issues only vs baseline)
 
 ```bash
-rice-guard scan [path] --diff-only
+rguard scan [path] --diff-only
 ```
 
 ## Output Files
@@ -108,7 +108,7 @@ cat reports/latest/issues.json | jq '[.[] | .file] | group_by(.) | map({file: .[
 
 ## MCP Integration
 
-When using rice-guard as an MCP server (`rice-guard mcp`):
+When using rguard as an MCP server (`rguard mcp`):
 
 | Tool                   | Description                          |
 | ---------------------- | ------------------------------------ |

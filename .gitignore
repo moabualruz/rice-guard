@@ -3,9 +3,9 @@
 **/*.rs.bk
 *.pdb
 
-# rice-guard config (generated per project — not committed by default)
+# rguard config (generated per project — not committed by default)
 # This repo's own dogfood config IS tracked via `git add -f`
-*.riceguard.yaml.bak
+*.rguard.yaml.bak
 
 # Cargo lock — include for binaries, exclude for libraries
 # This is a binary project, so we track Cargo.lock

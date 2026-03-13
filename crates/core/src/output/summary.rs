@@ -193,7 +193,7 @@ mod tests {
                 complexity: FixComplexity::Trivial,
             },
             verification: VerificationInfo {
-                rerun_command: "rice-guard scan .".to_string(),
+                rerun_command: "rguard scan .".to_string(),
                 success_condition: "no findings".to_string(),
             },
             priority_score: 20,

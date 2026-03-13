@@ -17,10 +17,10 @@ pub fn run(args: VersionArgs) -> anyhow::Result<i32> {
         return Ok(0);
     }
 
-    println!("rice-guard {}", env!("CARGO_PKG_VERSION"));
+    println!("rguard {}", env!("CARGO_PKG_VERSION"));
     println!(
         "Build: {}",
-        option_env!("RICE_GUARD_BUILD_INFO").unwrap_or("dev"),
+        option_env!("RGUARD_BUILD_INFO").unwrap_or("dev"),
     );
     Ok(0)
 }

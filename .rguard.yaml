@@ -1,6 +1,6 @@
 version: "1"
 project:
-  name: rice-guard
+  name: rguard
   languages:
     - rust
   topology: cli

@@ -1,6 +1,6 @@
 /// SARIF to SonarQube Generic Issue Data converter.
 ///
-/// Converts rice-guard SARIF output files into the SonarQube Generic Issue
+/// Converts rguard SARIF output files into the SonarQube Generic Issue
 /// Data JSON format for import via `sonar.externalIssuesReportPaths`.
 use std::path::Path;
 
@@ -68,7 +68,7 @@ fn relative_path(uri: &str, project_root: &Path) -> String {
 
 // ── Main converter ────────────────────────────────────────────────────────────
 
-/// Convert a SARIF file produced by rice-guard into SonarQube Generic Issue Data.
+/// Convert a SARIF file produced by rguard into SonarQube Generic Issue Data.
 ///
 /// Missing or malformed fields get safe defaults (empty strings, line 1).
 /// Returns an empty issues list if the SARIF `runs` array is absent.
@@ -272,6 +272,6 @@ mod tests {
 
     #[test]
     fn derive_project_key_valid_stays() {
-        assert_eq!(derive_project_key("rice-guard"), "rice-guard");
+        assert_eq!(derive_project_key("rguard"), "rguard");
     }
 }

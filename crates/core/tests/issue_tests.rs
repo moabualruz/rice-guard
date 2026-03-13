@@ -10,7 +10,7 @@ mod issue_tests {
     /// EVID-06 — fix.auto_fixable is true when a deterministic fixer can apply.
     #[test]
     fn fix_meta_auto_fixable_present() {
-        use rice_guard_core::issue::FixMetadata;
+        use rguard_core::issue::FixMetadata;
         // IssueBuilder populates auto_fixable via FixMetadata::from_finding().
         // For a clippy finding, auto_fixable must be true.
         let meta = FixMetadata::from_finding("clippy", "clippy::needless_return", None);
@@ -33,13 +33,13 @@ mod issue_tests {
     /// EVID-06 — fix.auto_fix_tool is Some when auto_fixable, None otherwise.
     #[test]
     fn fix_meta_tool_present() {
-        use rice_guard_core::issue::FixMetadata;
+        use rguard_core::issue::FixMetadata;
         let meta = FixMetadata {
             auto_fixable: true,
             auto_fix_tool: Some("cargo clippy --fix".to_string()),
             auto_fix_category: Some("linter".to_string()),
             suggested_replacement: None,
-            complexity: rice_guard_core::issue::FixComplexity::Trivial,
+            complexity: rguard_core::issue::FixComplexity::Trivial,
         };
         assert!(
             meta.auto_fix_tool.is_some(),
@@ -52,7 +52,7 @@ mod issue_tests {
     /// EVID-07 — verification.rerun_command is a non-empty shell command.
     #[test]
     fn verification_rerun_command_present() {
-        use rice_guard_core::issue::VerificationInfo;
+        use rguard_core::issue::VerificationInfo;
         // from_scanner() produces a rerun_command for every scanner.
         let semgrep_info = VerificationInfo::from_scanner("semgrep", "python.security.eval");
         assert!(
@@ -77,7 +77,7 @@ mod issue_tests {
     /// category(20) + file_freq(10) - cross_file(10).
     #[test]
     fn wsjf_score_correct() {
-        use rice_guard_core::issue::wsjf_score;
+        use rguard_core::issue::wsjf_score;
         // error + auto_fixable + formatter + freq=5 + not cross_file
         // = 40 + 20 + 20 + 5 - 0 = 85
         let score = wsjf_score("error", true, Some("formatter"), 5, false);
@@ -91,7 +91,7 @@ mod issue_tests {
     /// EVID-08 — sort_issues produces highest WSJF score first.
     #[test]
     fn wsjf_sort_order_highest_first() {
-        use rice_guard_core::issue::{
+        use rguard_core::issue::{
             sort_issues, wsjf_score, EvidenceBlock, FixComplexity, FixMetadata, Issue,
             VerificationInfo,
         };
@@ -120,7 +120,7 @@ mod issue_tests {
                 complexity: FixComplexity::Moderate,
             },
             verification: VerificationInfo {
-                rerun_command: "rice-guard scan .".to_string(),
+                rerun_command: "rguard scan .".to_string(),
                 success_condition: "no findings".to_string(),
             },
             priority_score: score,
@@ -156,13 +156,9 @@ mod issue_tests {
 
     // ── EVID-09: Three output files written ───────────────────────────────────
 
-    fn make_test_issue(
-        id: &str,
-        auto_fixable: bool,
-        file_path: &str,
-    ) -> rice_guard_core::issue::Issue {
-        use rice_guard_core::issue::{EvidenceBlock, FixComplexity, FixMetadata, VerificationInfo};
-        rice_guard_core::issue::Issue {
+    fn make_test_issue(id: &str, auto_fixable: bool, file_path: &str) -> rguard_core::issue::Issue {
+        use rguard_core::issue::{EvidenceBlock, FixComplexity, FixMetadata, VerificationInfo};
+        rguard_core::issue::Issue {
             id: id.to_string(),
             rule_id: "test-rule".to_string(),
             severity: "warning".to_string(),
@@ -194,7 +190,7 @@ mod issue_tests {
                 complexity: FixComplexity::Trivial,
             },
             verification: VerificationInfo {
-                rerun_command: "rice-guard scan .".to_string(),
+                rerun_command: "rguard scan .".to_string(),
                 success_condition: "no findings".to_string(),
             },
             priority_score: if auto_fixable { 60 } else { 20 },
@@ -207,14 +203,12 @@ mod issue_tests {
         }
     }
 
-    fn make_output_writer(dir: &std::path::Path) -> rice_guard_core::output::OutputWriter {
-        rice_guard_core::output::OutputWriter::new(dir)
+    fn make_output_writer(dir: &std::path::Path) -> rguard_core::output::OutputWriter {
+        rguard_core::output::OutputWriter::new(dir)
     }
 
-    fn make_summary(
-        issues: &[rice_guard_core::issue::Issue],
-    ) -> rice_guard_core::output::ScanSummary {
-        rice_guard_core::output::ScanSummary::from_issues(
+    fn make_summary(issues: &[rguard_core::issue::Issue]) -> rguard_core::output::ScanSummary {
+        rguard_core::output::ScanSummary::from_issues(
             issues,
             vec!["semgrep".to_string()],
             "/test/project",
@@ -272,7 +266,7 @@ mod issue_tests {
             std::fs::read(dir.path().join("issues-fixable.json")).expect("read fixable");
         let fixable_val: serde_json::Value =
             serde_json::from_slice(&fixable_bytes).expect("parse fixable");
-        let fixable: Vec<rice_guard_core::issue::Issue> =
+        let fixable: Vec<rguard_core::issue::Issue> =
             serde_json::from_value(fixable_val["issues"].clone())
                 .expect("parse fixable issues array");
         assert_eq!(fixable.len(), 2, "fixable.json must contain 2 issues");
@@ -285,7 +279,7 @@ mod issue_tests {
             std::fs::read(dir.path().join("issues-remaining.json")).expect("read remaining");
         let remaining_val: serde_json::Value =
             serde_json::from_slice(&remaining_bytes).expect("parse remaining");
-        let remaining: Vec<rice_guard_core::issue::Issue> =
+        let remaining: Vec<rguard_core::issue::Issue> =
             serde_json::from_value(remaining_val["issues"].clone())
                 .expect("parse remaining issues array");
         assert_eq!(remaining.len(), 1, "remaining.json must contain 1 issue");
@@ -311,7 +305,7 @@ mod issue_tests {
         writer.write_all(&issues, &summary).expect("write_all");
 
         let summary_bytes = std::fs::read(dir.path().join("summary.json")).expect("read summary");
-        let parsed: rice_guard_core::output::ScanSummary =
+        let parsed: rguard_core::output::ScanSummary =
             serde_json::from_slice(&summary_bytes).expect("parse summary");
         assert_eq!(parsed.total_issues, 3, "total_issues must be 3");
         assert_eq!(parsed.fixable_count, 2, "fixable_count must be 2");
@@ -444,8 +438,8 @@ mod issue_tests {
     /// with a non-empty string matching one of the four tier labels.
     #[test]
     fn priority_tier_present() {
-        use rice_guard_core::issue::IssueBuilder;
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::IssueBuilder;
+        use rguard_core::scanner::parser::RawFinding;
         use std::path::Path;
 
         let finding = RawFinding {
@@ -478,7 +472,7 @@ mod issue_tests {
     /// with correct stage keys when issues have auto_fix_category set.
     #[test]
     fn summary_json_has_fix_queue_by_category() {
-        use rice_guard_core::output::ScanSummary;
+        use rguard_core::output::ScanSummary;
         use std::collections::HashMap;
 
         // Build issues with known categories.
@@ -518,7 +512,7 @@ mod issue_tests {
     /// file's language (descriptor-driven lookup).
     #[test]
     fn descriptor_driven_auto_fixable_python() {
-        use rice_guard_core::issue::{FixMetadata, FixerDescriptorInfo};
+        use rguard_core::issue::{FixMetadata, FixerDescriptorInfo};
         let descriptors = vec![FixerDescriptorInfo {
             language: "python".to_string(),
             stages: vec!["linters".to_string()],
@@ -545,7 +539,7 @@ mod issue_tests {
     /// EVID-05 — auto_fixable is false when no descriptor matches the extension.
     #[test]
     fn descriptor_driven_auto_fixable_no_descriptor() {
-        use rice_guard_core::issue::{FixMetadata, FixerDescriptorInfo};
+        use rguard_core::issue::{FixMetadata, FixerDescriptorInfo};
         let descriptors = vec![FixerDescriptorInfo {
             language: "python".to_string(),
             stages: vec!["linters".to_string()],
@@ -568,8 +562,8 @@ mod issue_tests {
     /// rule_id appears in 3+ distinct files.
     #[test]
     fn cross_file_penalty_triggers_at_3_files() {
-        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rguard_core::scanner::parser::RawFinding;
 
         let make = |file: &str| RawFinding {
             scanner: "semgrep".to_string(),
@@ -595,8 +589,8 @@ mod issue_tests {
     /// EVID-05 — cross_file remains false when rule appears in fewer than 3 files.
     #[test]
     fn cross_file_no_penalty_below_threshold() {
-        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rguard_core::scanner::parser::RawFinding;
 
         let make = |file: &str| RawFinding {
             scanner: "semgrep".to_string(),
@@ -622,8 +616,8 @@ mod issue_tests {
     /// EVID-05 — build_batch() returns one issue per finding.
     #[test]
     fn build_batch_returns_all_issues() {
-        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rguard_core::scanner::parser::RawFinding;
 
         let findings: Vec<RawFinding> = (0..5)
             .map(|i| RawFinding {
@@ -650,8 +644,8 @@ mod issue_tests {
     /// EVID-05 — all issues from build_batch() have a non-empty priority_tier.
     #[test]
     fn priority_tier_set_by_build_batch() {
-        use rice_guard_core::issue::{FixerDescriptorInfo, IssueBuilder};
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::{FixerDescriptorInfo, IssueBuilder};
+        use rguard_core::scanner::parser::RawFinding;
 
         let findings: Vec<RawFinding> = (0..3)
             .map(|i| RawFinding {
@@ -687,8 +681,8 @@ mod issue_tests {
     /// EVID-05 — file_freq_with_churn() does not panic in a non-git dir.
     #[test]
     fn git_churn_graceful_fallback() {
-        use rice_guard_core::issue::file_freq_with_churn;
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::file_freq_with_churn;
+        use rguard_core::scanner::parser::RawFinding;
 
         let findings = vec![RawFinding {
             scanner: "semgrep".to_string(),
@@ -715,8 +709,8 @@ mod issue_tests {
     /// EVID-05 — combined score is capped at 10 even with high issue count and churn.
     #[test]
     fn git_churn_combined_score_capped_at_10() {
-        use rice_guard_core::issue::file_freq_with_churn;
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::file_freq_with_churn;
+        use rguard_core::scanner::parser::RawFinding;
 
         // 20 findings in the same file → issue_norm = min(20, 5) = 5.
         // Even if churn is very large, score must be capped at 10.
@@ -742,8 +736,8 @@ mod issue_tests {
     /// EVID-05 — file with 3 findings in a non-git dir returns score in 1..=5.
     #[test]
     fn file_freq_with_churn_basic() {
-        use rice_guard_core::issue::file_freq_with_churn;
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::file_freq_with_churn;
+        use rguard_core::scanner::parser::RawFinding;
 
         let findings: Vec<RawFinding> = (0..3)
             .map(|i| RawFinding {
@@ -769,8 +763,8 @@ mod issue_tests {
     /// EVID-05 — existing file_freq_map() still works correctly.
     #[test]
     fn file_freq_map_still_works() {
-        use rice_guard_core::issue::file_freq_map;
-        use rice_guard_core::scanner::parser::RawFinding;
+        use rguard_core::issue::file_freq_map;
+        use rguard_core::scanner::parser::RawFinding;
 
         let findings = vec![
             RawFinding {
@@ -814,7 +808,7 @@ mod issue_tests {
     /// Verify ScanSummary has all required Phase 3 fields (compile-time check).
     #[test]
     fn scan_summary_has_required_fields() {
-        use rice_guard_core::output::ScanSummary;
+        use rguard_core::output::ScanSummary;
         use std::collections::HashMap;
 
         let summary = ScanSummary {
