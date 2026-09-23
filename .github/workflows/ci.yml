@@ -13,7 +13,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, generic]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -35,10 +35,10 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
+            os: [self-hosted, linux, x64, generic]
             install: musl-tools
           - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
+            os: [self-hosted, linux, x64, generic]
             install: gcc-aarch64-linux-gnu musl-tools
           - target: x86_64-apple-darwin
             os: macos-latest
@@ -61,7 +61,7 @@ jobs:
           key: ${{ matrix.target }}
       - name: Install cross-compile deps (Linux)
         if: matrix.install != ''
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.install }}
+        run: command -v apt-get >/dev/null || exit 0; sudo apt-get update && sudo apt-get install -y ${{ matrix.install }}
       - name: cargo build --release
         run: cargo build --release --target ${{ matrix.target }}
         env:
