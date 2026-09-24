@@ -320,7 +320,7 @@ mod tests {
     // Helper: a command that always exits non-zero (check = "has issues")
     #[cfg(unix)]
     fn always_fail_cmd() -> String {
-        "sh -c 'exit 1'".to_string()
+        "/bin/sh -c 'exit 1'".to_string()
     }
     #[cfg(windows)]
     fn always_fail_cmd() -> String {
@@ -330,7 +330,7 @@ mod tests {
     // Helper: a command that always exits 0 (check = "no issues" / fix success)
     #[cfg(unix)]
     fn always_pass_cmd() -> String {
-        "sh -c 'exit 0'".to_string()
+        "/bin/sh -c 'exit 0'".to_string()
     }
     #[cfg(windows)]
     fn always_pass_cmd() -> String {
@@ -351,7 +351,7 @@ mod tests {
         let sentinel_str = sentinel.to_string_lossy().replace('\\', "/");
 
         #[cfg(unix)]
-        let check_cmd = format!("sh -c 'test -f \"{sentinel_str}\" && exit 1 || exit 0'");
+        let check_cmd = format!("/bin/sh -c 'test -f \"{sentinel_str}\" && exit 1 || exit 0'");
         #[cfg(windows)]
         let check_cmd = format!(
             "cmd /C if exist \"{sentinel_str}\" (exit 1) else (exit 0)",
@@ -359,7 +359,7 @@ mod tests {
         );
 
         #[cfg(unix)]
-        let fix_cmd = format!("sh -c 'rm -f \"{sentinel_str}\"'");
+        let fix_cmd = format!("/bin/sh -c '/bin/rm -f \"{sentinel_str}\"'");
         #[cfg(windows)]
         let fix_cmd = format!(
             "cmd /C del /F /Q \"{sentinel_str}\"",
@@ -457,12 +457,12 @@ mod tests {
         // We use the always-pass command with {{files}} appended to verify
         // the substitution happens without error.
         #[cfg(unix)]
-        let check_cmd = "sh -c 'exit 1'".to_string();
+        let check_cmd = "/bin/sh -c 'exit 1'".to_string();
         #[cfg(windows)]
         let check_cmd = "cmd /C exit 1".to_string();
 
         #[cfg(unix)]
-        let fix_cmd = "sh -c 'echo {{files}} > /dev/null && exit 0'".to_string();
+        let fix_cmd = "/bin/sh -c 'echo {{files}} > /dev/null && exit 0'".to_string();
         #[cfg(windows)]
         let fix_cmd = "cmd /C exit 0".to_string();
 
