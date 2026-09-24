@@ -84,7 +84,12 @@ impl OutputDir {
 
         #[cfg(not(windows))]
         {
-            match std::os::unix::fs::symlink(target_name, &latest) {
+            match std::os::unix::fs::symlink(
+                self.path
+                    .strip_prefix(base_dir)
+                    .unwrap_or(target_name.as_ref()),
+                &latest,
+            ) {
                 Ok(()) => {}
                 Err(e) => {
                     tracing::warn!("reports/latest symlink failed: {}", e);
