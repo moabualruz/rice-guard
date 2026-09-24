@@ -145,7 +145,7 @@ fn git_churn_for_file(file_path: &str, project_root: &std::path::Path) -> u32 {
 ///
 /// Issues with equal scores retain their original relative order (stable sort).
 pub fn sort_issues(issues: &mut [super::Issue]) {
-    issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
+    issues.sort_by_key(|a| std::cmp::Reverse(a.priority_score));
 }
 
 #[cfg(test)]

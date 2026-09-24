@@ -119,7 +119,7 @@ impl OutputWriter {
 
     /// Sort issues by WSJF priority score, highest first.
     pub fn sort_by_priority(issues: &mut [Issue]) {
-        issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
+        issues.sort_by_key(|a| std::cmp::Reverse(a.priority_score));
     }
 }
 
@@ -127,7 +127,7 @@ impl OutputWriter {
 ///
 /// Module-level function for use in the scan CLI pipeline.
 pub fn sort_issues(issues: &mut [Issue]) {
-    issues.sort_by(|a, b| b.priority_score.cmp(&a.priority_score));
+    issues.sort_by_key(|a| std::cmp::Reverse(a.priority_score));
 }
 
 #[cfg(test)]
