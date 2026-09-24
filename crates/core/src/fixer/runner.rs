@@ -347,7 +347,8 @@ mod tests {
         let sentinel = dir.path().join("has_issues.flag");
         std::fs::write(&sentinel, "1").unwrap();
 
-        let _sentinel_str = sentinel.to_string_lossy().replace('\\', "/");
+        #[cfg(unix)]
+        let sentinel_str = sentinel.to_string_lossy().replace('\\', "/");
 
         #[cfg(unix)]
         let check_cmd = format!("sh -c 'test -f \"{sentinel_str}\" && exit 1 || exit 0'");
@@ -456,12 +457,12 @@ mod tests {
         // We use the always-pass command with {{files}} appended to verify
         // the substitution happens without error.
         #[cfg(unix)]
-        let check_cmd = format!("sh -c 'exit 1'");
+        let check_cmd = "sh -c 'exit 1'".to_string();
         #[cfg(windows)]
         let check_cmd = "cmd /C exit 1".to_string();
 
         #[cfg(unix)]
-        let fix_cmd = format!("sh -c 'echo {{{{files}}}} > /dev/null && exit 0'");
+        let fix_cmd = "sh -c 'echo {{files}} > /dev/null && exit 0'".to_string();
         #[cfg(windows)]
         let fix_cmd = "cmd /C exit 0".to_string();
 
